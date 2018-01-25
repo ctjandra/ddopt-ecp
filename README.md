@@ -1,2 +1,3 @@
-# ddopt-ecp
-Integer nonlinear programming solver using decision diagrams
+# Dexter
+
+Decision diagram-based extended cutting plane solver
