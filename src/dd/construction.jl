@@ -3,7 +3,7 @@ include("dd.jl")
 """
 Construct a decision diagram.
 """
-function construct_DD(n::Int, objective::Array, ordering::Ordering, problem::ProblemSpecs)
+function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrdering(), objective::Array = ones[n])
 
 	# TODO
 	# - This is not a top-down search, but a simple depth-first one
@@ -18,7 +18,7 @@ function construct_DD(n::Int, objective::Array, ordering::Ordering, problem::Pro
 
 	# Add source node
 	source = add_node!(dd, 1, problem.initial_state)
-	set_objval!(dd, source, 0.0)
+	set_node_objval!(dd, source, 0.0)
 	layer_states[1][problem.initial_state] = source
 
 	unexplored_nodes = [source]
@@ -29,14 +29,14 @@ function construct_DD(n::Int, objective::Array, ordering::Ordering, problem::Pro
 		# Read next unexplored node
 		node = pop!(unexplored_nodes)
 		niters += 1
-		layer = get_layer(dd, node)
+		layer = get_node_layer(dd, node)
 
 		if layer > n
 			continue # terminal node
 		end
 
-		state = get_state(dd, node)
-		node_objval = get_value(dd, node, :objval)
+		state = get_node_state(dd, node)
+		node_objval = get_node_value(dd, node, :objval)
 		var = get_var(ordering, layer)
 
 		println("Layer $(layer): exploring $(node)")
@@ -53,20 +53,20 @@ function construct_DD(n::Int, objective::Array, ordering::Ordering, problem::Pro
 			next_layer = layer + 1
 			states_to_nodes = layer_states[next_layer]
 
-			new_value = node_objval + val * objective[var]
+			new_value = node_objval + val * objective[var]		#only for linear objective functions
 
 			# Equivalence check
 			if haskey(states_to_nodes, new_state)
 				# Equivalent node found: update it
 				t = states_to_nodes[new_state]
-				t_objval = get_objval(dd, t)
+				t_objval = get_node_objval(dd, t)
 				if t_objval < new_value
-					set_objval!(dd, t, new_value)
+					set_node_objval!(dd, t, new_value)
 				end
 			else
 				# No equivalent node: create new child
 				t = add_node!(dd, next_layer, new_state)
-				set_objval!(dd, t, new_value)
+				set_node_objval!(dd, t, new_value)
 				states_to_nodes[new_state] = t
 			end
 
