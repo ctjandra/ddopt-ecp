@@ -9,6 +9,7 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 	# - This is not a top-down search, but a simple depth-first one
 	# - Implement long arcs
 	# - Implement mapping between problem variables and DD variables
+	# - Implement reduction
 
 	@assert(n == length(objective))
 	dd = DecisionDiagram(n)

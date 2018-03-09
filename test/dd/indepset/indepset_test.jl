@@ -28,9 +28,9 @@ ordering = Dexter.NoOrdering()
 objective = ones(n)
 
 # Construct decision diagram
-dd = Dexter.construct_DD(n, objective, ordering, indepset_specs)
+dd = Dexter.construct_DD(n, indepset_specs, ordering=ordering, objective=objective)
 
 # Plot decision diagram
-locs_x = [Dexter.get_idlayer(dd, i) * 1.0 for i in 1:nv(dd.graph)]
-locs_y = [Dexter.get_layer(dd, i) / n for i in 1:nv(dd.graph)]
+locs_x = [Dexter.get_node_idlayer(dd, i) * 1.0 for i in 1:nv(dd.graph)]
+locs_y = [Dexter.get_node_layer(dd, i) / n for i in 1:nv(dd.graph)]
 gplot(dd.graph, locs_x, locs_y) |> PNG("test.png", 16cm, 16cm)

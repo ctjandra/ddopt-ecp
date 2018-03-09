@@ -81,7 +81,7 @@ function add_arc!(dd::DecisionDiagram, node1::Int, node2::Int, label::Number)
 	# We use a list for labels because LightGraphs does not support parallel edges
 	if !has_edge(g, e)
 		add_edge!(g, e)
-		set_prop!(g, e, :layer, get_node_layer(g, node2) - 1)	#if the head node has layer k, the arc layer is k-1 (account for long arcs too)
+		set_prop!(g, e, :layer, get_node_layer(dd, node2) - 1)	#if the head node has layer k, the arc layer is k-1 (account for long arcs too)
 		set_prop!(g, e, :label, [label])
 	else
 		push!(get_prop(g, e, :label), label)
