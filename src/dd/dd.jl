@@ -9,11 +9,11 @@ end
 
 """Decision diagram structure"""
 mutable struct DecisionDiagram
-	graph::MetaGraph
+	graph::MetaDiGraph
     layers::Array{Array{Int}}
 end
 
-DecisionDiagram(nvars::Int) = DecisionDiagram(MetaGraph(), [[] for i=1:nvars+1])
+DecisionDiagram(nvars::Int) = DecisionDiagram(MetaDiGraph(), [[] for i=1:nvars+1])
 
 """Attach a value to a decision diagram node"""
 set_node_value!(dd::DecisionDiagram, node::Int, key::Symbol, value::Any) = set_prop!(dd.graph, node, key, value)
@@ -28,8 +28,13 @@ set_node_idlayer!(dd::DecisionDiagram, node::Int, value::Int) = set_prop!(dd.gra
 get_node_idlayer(dd::DecisionDiagram, node::Int) = get_prop(dd.graph, node, :idlayer)
 
 # Non-essential properties that are common
-set_node_objval!(dd::DecisionDiagram, node::Int, value::Real) = set_prop!(dd.graph, node, :objval, value)	#objval represents the longest path from source to the node
-get_node_objval(dd::DecisionDiagram, node::Int) = get_prop(dd.graph, node, :objval)
+set_node_obj_val!(dd::DecisionDiagram, node::Int, value::Real) = set_prop!(dd.graph, node, :obj_val, value)	#obj_val represents the longest path from source to the node
+get_node_obj_val(dd::DecisionDiagram, node::Int) = get_prop(dd.graph, node, :obj_val)
+set_node_obj_path!(dd::DecisionDiagram, node::Int, value::Real) = set_prop!(dd.graph, node, :obj_path, value)	#obj_path represents the parent node on the longest path to the node
+get_node_obj_path(dd::DecisionDiagram, node::Int) = get_prop(dd.graph, node, :obj_path)
+set_node_obj_label!(dd::DecisionDiagram, node::Int, value::Real) = set_prop!(dd.graph, node, :obj_label, value)	#obj_label represents the label of the longest path to the node
+get_node_obj_label(dd::DecisionDiagram, node::Int) = get_prop(dd.graph, node, :obj_label)
+
 
 """Add a new node to the decision diagram with a given state and return the node's id"""
 function add_node!(dd::DecisionDiagram, layer::Int, state::Any)
