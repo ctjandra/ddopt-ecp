@@ -11,7 +11,6 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 	# - Implement mapping between problem variables and DD variables
 	# - Implement reduction
 
-	@assert(n == length(objective))
 	dd = DecisionDiagram(n)
 
 	# TODO For top-down, this should probably only be a single Dict
@@ -51,7 +50,6 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 
 			next_layer = layer + 1
 			states_to_nodes = layer_states[next_layer]
-
 
 			# Equivalence check
 			if haskey(states_to_nodes, new_state)

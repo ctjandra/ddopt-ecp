@@ -25,10 +25,9 @@ indepset_specs = Dexter.ProblemSpecs(initial_state, transition, domain_function)
 # Set ordering and objective
 n = nv(g)
 ordering = Dexter.NoOrdering()
-objective = ones(n)
 
 # Construct decision diagram
-dd = Dexter.construct_DD(n, indepset_specs, ordering=ordering, objective=objective)
+dd = Dexter.construct_DD(n, indepset_specs, ordering=ordering)
 
 # Plot decision diagram
 locs_x = [Dexter.get_node_idlayer(dd, i) * 1.0 for i in 1:nv(dd.graph)]

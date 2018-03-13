@@ -5,7 +5,7 @@ Function: Finds a longest path on DD.
 Input: The DD, and an array of functions (each component represents the separable function for that variable)
 Output: The longest path (composed of arc labels), and its length
 """
-function Longest_Path!(dd::DecisionDiagram, func::Array{Function})
+function longest_path!(dd::DecisionDiagram, func::Array{Function})
 
     n = size(dd.layers, 1) - 1     #the number of arc layers of dd
     @assert(n == length(func))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
@@ -24,7 +24,7 @@ function Longest_Path!(dd::DecisionDiagram, func::Array{Function})
     for i=2:n+1, j in layers[i]
         temp_v = -Inf
         for k in in_neighbors(g, j), l in get_arc_label(dd, k, l)
-            val = get_node_obj_val(dd, k) + func[i-1](l)    #computes the head node valu based on the tail and arc label
+            val = get_node_obj_val(dd, k) + func[i-1](l)    #computes the head node value based on the tail and arc label
             if val > temp_v
                 temp_v = val
                 temp_p = k
@@ -58,10 +58,10 @@ Funtion: Second method for function Longest_Path!, where the separable functions
 Input: The DD, and an array of coefficient of the variables in the linear objective function
 Output: The longest path (composed of arc labels), and its length
 """
-function Longest_Path!(dd::DecisionDiagram, cf::Array{Float64})
+function longest_path!(dd::DecisionDiagram, cf::Array{Float64})
     func = []
     for c in cf                 #creates an array of separable functions for each variable
         push!(func, (x::Int64) -> c*x )
     end
-    return Longest_Path!(dd, func)
+    return longest_path!(dd, func)
 end

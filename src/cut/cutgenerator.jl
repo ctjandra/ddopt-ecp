@@ -147,7 +147,7 @@ function Subgradient!(dd::DecisionDiagram, fp::Array{Float64,1}; step_rule::Int6
     while stop_rule(st)
 
         #computing the longest path with the objective function defined by the current direction
-        lp1, lpv1 = Longest_Path!(dd, sp1)
+        lp1, lpv1 = longest_path!(dd, sp1)
 
         #computing the violatation value of the current inequality at the given fractional point
         delta = gamma'*fp - lpv1
