@@ -1,4 +1,5 @@
 include("../dd/dd.jl")
+include("../dd/functions.jl")
 
 #Pkg.add("Clp")     #An open source LP solver
 #Pkg.add("JuMP")    #A modeling interface
@@ -47,12 +48,12 @@ function CGLP(dd::DecisionDiagram, fp::Array{Float64,1})
         lyr = get_arc_layer(dd, e)  #gets the layer of e
         lbl = get_arc_label(dd, e)  #gets a vector of possible labels for the arc (in case of parallel arcs)
         for l in lbl
-            @constraint(m, ProjCone[e,l], theta_plus[t_e] - theta_minus[t_e] - theta_plus[h_e] + theta_minus[h_e] + (gamma_plus[lyr] - gamma_minus[lyr])*l <= 0)
+            @constraint(m, theta_plus[t_e] - theta_minus[t_e] - theta_plus[h_e] + theta_minus[h_e] + (gamma_plus[lyr] - gamma_minus[lyr])*l <= 0)
         end
     end
 
     #adding normalization constraints
-    @constraint(m, NormCon, sum(gamma_plus[i] + gamma_minus[i] for i in 1:n) <= 1)
+    @constraint(m, sum(gamma_plus[i] + gamma_minus[i] for i in 1:n) <= 1)
 
     #solving the model
     status = solve(m)
@@ -76,7 +77,7 @@ Subgradient: function to generate cuts via the subgradient method
 Input: DD, the point to be separated (as a vector); step size rule (optional), starting point (optional)
 Output: the optimal value of the CGLP, the coefficient vector and the right-hand-side of the resulting inequality
 """
-function Subgradient!(dd::DecisionDiagram, fp::Array{Float64,1}; step_rule::Int64 = 0, sp::Array{Float64,1} = zeros(length(fp)))
+function subgradient!(dd::DecisionDiagram, fp::Array{Float64}; step_rule::Int64 = 0, sp::Array{Float64} = zeros(length(fp)))
 
     n = size(dd.layers, 1) - 1     #the number of arc layers of dd
     @assert(n == length(fp))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
@@ -124,7 +125,7 @@ function Subgradient!(dd::DecisionDiagram, fp::Array{Float64,1}; step_rule::Int6
     iter_max = 100      #the maximum number of iterations to execute the algorithm
     tolerance = 0.05    #the tolerance for relative objective improvement
     tol_num = 2         #the number of past objective values wrt which the tolerance is computed. This number includes the current objective value
-    obj_history = [0 for i=1:tol_num]    #the vector that stores the previous (improved) objective values for tolerance check
+    obj_history = [0.0 for i=1:tol_num]    #the vector that stores the previous (improved) objective values for tolerance check
 
     #function to define what stopping criterion must be used: 0: only iteration number, 1: only objective improvement, 2: both
     function stop_rule(st::Int64)
@@ -147,7 +148,7 @@ function Subgradient!(dd::DecisionDiagram, fp::Array{Float64,1}; step_rule::Int6
     while stop_rule(st)
 
         #computing the longest path with the objective function defined by the current direction
-        lp1, lpv1 = longest_path!(dd, sp1)
+        lp1, lpv1 = longest_path!(dd, gamma)
 
         #computing the violatation value of the current inequality at the given fractional point
         delta = gamma'*fp - lpv1

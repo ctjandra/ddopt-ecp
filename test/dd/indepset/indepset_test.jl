@@ -11,7 +11,9 @@ include("indepset.jl")
 # g = read_graph("test/dd/indepset/instances/random_200_50_0.clq")
 # g = PathGraph(10)
 # g = erdos_renyi(20, 0.5)
-g = watts_strogatz(20, 7, 0.8)
+g = erdos_renyi(50, 0.5)
+# g = watts_strogatz(20, 7, 0.8)
+# g = CliqueGraph(100, 1)
 
 # Plot graph
 gplot(g) |> PNG("graph.png", 16cm, 16cm)
@@ -29,7 +31,12 @@ ordering = Dexter.NoOrdering()
 # Construct decision diagram
 dd = Dexter.construct_DD(n, indepset_specs, ordering=ordering)
 
+println("Done with construction")
+
 # Plot decision diagram
 locs_x = [Dexter.get_node_idlayer(dd, i) * 1.0 for i in 1:nv(dd.graph)]
 locs_y = [Dexter.get_node_layer(dd, i) / n for i in 1:nv(dd.graph)]
 gplot(dd.graph, locs_x, locs_y) |> PNG("test.png", 16cm, 16cm)
+
+@time println(Dexter.CGLP(dd, rand(n)))
+@time println(Dexter.subgradient!(dd, rand(n), step_rule=2))

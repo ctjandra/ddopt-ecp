@@ -37,7 +37,7 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 		state = get_node_state(dd, node)
 		var = get_var(ordering, layer)
 
-		println("Layer $(layer): exploring $(node)")
+		# println("Layer $(layer): exploring $(node)")
 
 		# Create children
 		for val in problem.domain_function(var)
@@ -65,7 +65,7 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 			push!(unexplored_nodes, t)
 
 			add_arc!(dd, node, t, val)
-			println("Added $val-arc from $node to $t")
+			# println("Added $val-arc from $node to $t")
 		end
 	end
 
