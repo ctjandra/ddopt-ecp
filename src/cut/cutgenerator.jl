@@ -12,7 +12,7 @@ CGLP: function to generate CGLP cuts
 Input: DD, and the point to be separated (as a vector)
 Output: the optimal value of the CGLP, the coefficient vector and the right-hand-side of the resulting inequality, and the status of the CGLP
 """
-function CGLP(dd::DecisionDiagram, fp::Array{Float64,1})
+function CGLP(dd::DecisionDiagram, fp::Array{Float64})
 
     n = size(dd.layers, 1) - 1     #the number of arc layers of dd
     @assert(n == length(fp))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
@@ -77,7 +77,7 @@ Subgradient: function to generate cuts via the subgradient method
 Input: DD, the point to be separated (as a vector); step size rule (optional), starting point (optional)
 Output: the optimal value of the CGLP, the coefficient vector and the right-hand-side of the resulting inequality
 """
-function subgradient!(dd::DecisionDiagram, fp::Array{Float64}; step_rule::Int64 = 0, sp::Array{Float64} = zeros(length(fp)))
+function subgradient(dd::DecisionDiagram, fp::Array{Float64}; step_rule::Int64 = 0, sp::Array{Float64} = zeros(length(fp)))
 
     n = size(dd.layers, 1) - 1     #the number of arc layers of dd
     @assert(n == length(fp))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
@@ -113,8 +113,10 @@ function subgradient!(dd::DecisionDiagram, fp::Array{Float64}; step_rule::Int64 
     best_obj = 0            #best objecive found so far
     best_cf = zeros(n)      #coefficient vector corresponding to the best objective
     best_rhs = 0            #right-hand-side value corresponding to the best objective
+    delta = 0               #the violation value (objective value)
+    subgrad = ones(n)       #subgradient vector
     iter = 1                #iteration number
-    st = 0                  #stopping criterion
+    st = [0]                #stopping criterion
     if norm(sp) > 0         #normalizing the starting point and making a copy
         gamma = sp/norm(sp)
     else
@@ -123,21 +125,29 @@ function subgradient!(dd::DecisionDiagram, fp::Array{Float64}; step_rule::Int64 
 
     #stopping criteria
     iter_max = 100      #the maximum number of iterations to execute the algorithm
-    tolerance = 0.05    #the tolerance for relative objective improvement
+    tolerance = 0.05    #the tolerance for relative error
     tol_num = 2         #the number of past objective values wrt which the tolerance is computed. This number includes the current objective value
-    obj_history = [0.0 for i=1:tol_num]    #the vector that stores the previous (improved) objective values for tolerance check
+    obj_history = zeroes(tol_num)    #the vector that stores the previous (improved) objective values for tolerance check
 
-    #function to define what stopping criterion must be used: 0: only iteration number, 1: only objective improvement, 2: both
-    function stop_rule(st::Int64)
+    #function to define what stopping criterion must be used:
+    #0: iteration number
+    #1: concavity error: obtained from the first order concavity inequality over the unit ball normalization constraint: at iteration t, the objective error is <= norm of subgradient - violation value
+    #2: objective improvement: the relative difference between k consequtive improvements
+    function stop_rule(st::Array{Int64})   #multiple stopping criteria can be passed as an array
         p = true
-        if st == 0 || st == 2       #uses the number of iteration criterion
-            p = iter <= iter_max
-        end
-        if st == 1 || st == 2       #uses the objective improvement criterion
-            if endof(obj_history) != best_obj   #if the objective value is updated, the obj_history vector must be updated as well and the criterion is checked
-                push!(obj_history, best_obj)
-                deleteat!(obj_history, 1)
-                p = p && (best_obj - obj_history[1])/best_obj > tolerance
+        for v in st
+            if v == 0       #uses the number of iteration criterion
+                p = p && iter <= iter_max
+            end
+            if v == 1       #uses the concavity error criterion
+                p = p && (norm(subgrad) - delta)/(norm(subgrad) + 1e-5) > tolerance
+            end
+            if v == 2       #uses the objective improvement criterion
+                if obj_history[end] != best_obj   #if the objective value is updated, the obj_history vector must be updated as well and the criterion is checked
+                    push!(obj_history, best_obj)
+                    deleteat!(obj_history, 1)
+                    p = p && (best_obj - obj_history[1])/best_obj > tolerance
+                end
             end
         end
         return p    #is false when the stopping criterion is met
@@ -148,7 +158,7 @@ function subgradient!(dd::DecisionDiagram, fp::Array{Float64}; step_rule::Int64 
     while stop_rule(st)
 
         #computing the longest path with the objective function defined by the current direction
-        lp1, lpv1 = longest_path!(dd, gamma)
+        lp1, lpv1 = longest_path(dd, gamma)
 
         #computing the violatation value of the current inequality at the given fractional point
         delta = gamma'*fp - lpv1
@@ -157,7 +167,7 @@ function subgradient!(dd::DecisionDiagram, fp::Array{Float64}; step_rule::Int64 
             best_obj = delta
             best_cf = gamma
             best_rhs = lpv1
-            st = 2          #changes the stop rule to the one that considers both iteration number and objective improvement
+            st = [0,1]          #changes the stop rule to the one that considers both iteration number and concavity error
         end
 
         #computing the subgradient at current iteation
