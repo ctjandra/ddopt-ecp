@@ -1,7 +1,39 @@
-include("dd.jl")
+include("ordering.jl")
 
-"""
-Construct a decision diagram.
+using LightGraphs, MetaGraphs
+
+
+
+"""Decision diagram structure"""
+mutable struct DecisionDiagram
+	graph::MetaDiGraph				#represents the directed graph of the DD
+    layers::Array{Array{Int}}		#stores index of nodes at each node layer
+end
+
+DecisionDiagram(nvars::Int) = DecisionDiagram(MetaDiGraph(), [[] for i=1:nvars+1])
+
+
+
+
+"""Problem specifications required to construct decision diagram"""
+struct ProblemSpecs
+	initial_state::Any               # Initial state at the root
+	transition_function::Function    # Transition function of DP formulation
+	domain_range::Array{Range}       # domain range for each variable
+end
+
+
+
+"""^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Function: Construct a decision diagram.
+
+Input:
+n: Number of variables (arc layers)
+problem: Problem specification (initial state, transition function, domain function) based on DP formulation of the problem
+ordering: Ordering of the variables in DD
+
+Output:
+Constructed DD
 """
 function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrdering())
 
@@ -17,7 +49,7 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 	layer_states = [Dict{Any, Int}() for i=1:n+1]
 
 	# Add source node
-	source = add_node!(dd, 1, problem.initial_state)
+	source = add_node!(dd, 1, problem.initial_state)	#the index of the created node
 	layer_states[1][problem.initial_state] = source
 
 	unexplored_nodes = [source]
@@ -40,7 +72,7 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 		# println("Layer $(layer): exploring $(node)")
 
 		# Create children
-		for val in problem.domain_function(var)
+		for val in problem.domain_range[var]
 			new_state = problem.transition_function(state, var, val)
 
 			# Nothing to do if new state is the false node
@@ -54,15 +86,14 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 			# Equivalence check
 			if haskey(states_to_nodes, new_state)
 				# Equivalent node found: update it
-				t = states_to_nodes[new_state]
+				t = states_to_nodes[new_state]		#the index of the node with that state
 			else
 				# No equivalent node: create new child
 				t = add_node!(dd, next_layer, new_state)
 				states_to_nodes[new_state] = t
+				# Insert new node into list of unexplored nodes
+				push!(unexplored_nodes, t)
 			end
-
-			# Insert new node into list of unexplored nodes
-			push!(unexplored_nodes, t)
 
 			add_arc!(dd, node, t, val)
 			# println("Added $val-arc from $node to $t")

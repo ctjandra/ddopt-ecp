@@ -36,3 +36,7 @@ Given a decision diagram, return a JuMP constraint consisting of the DD cut.
 ## Create test set
 
 A test set would be a set of instances with additively separable constraints in JuMP model format.
+
+## Questions:
+
+* How do we keep the connection between the constraints of the model and their corresponding DD? Does the initial index remain the same after the model is modified (cuts are added to the model), or we should use some constraint reference object to keep this track?

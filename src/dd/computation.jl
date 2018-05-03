@@ -1,9 +1,15 @@
 include("dd.jl")
 
 """
-Function: Finds a longest path on DD.
-Input: The DD, and an array of functions (each component represents the separable function for that variable)
-Output: The longest path (composed of arc labels), and its length
+Find a longest path on DD.
+
+# Input
+- `dd::DecisionDiagram`: The DD.
+- `func::Array{Function}`: An array of weight functions (each component represents the separable function for that variable)
+
+# Output
+- The longest path (composed of arc labels)
+- The length of the longest path
 """
 function longest_path(dd::DecisionDiagram, func::Array{Function})
 
@@ -17,15 +23,15 @@ function longest_path(dd::DecisionDiagram, func::Array{Function})
     #getting the index of the source and the terminal node
     source_ind = dd.layers[1][1]            #gets the index value of the source node
 
-    node_obj_vals = Array{Real}(node_num)
-    node_obj_paths = Array{Int}(node_num)
-    node_obj_labels = Array{Int}(node_num)
+    node_obj_vals = Array{Real}(node_num)   #stores the maximum objective value computed from the source to each node
+    node_obj_paths = Array{Int}(node_num)   #at each node, stores the index of the previous node of longest path from source to that node
+    node_obj_labels = Array{Int}(node_num)  #stores the label value of the last arc of the longest path from source to each node
 
-    #setting the source objective value at zero
+    #setting the source objective value equal to zero
     # set_node_obj_val!(dd, source_ind, 0)
     node_obj_vals[source_ind] = 0
 
-    #computing the longest path from source to a node, by searching through all nodes and their incoming arcs layer by layer
+    #computing the longest path from source to a node, by searching through all nodes and their incoming arcs, layer by layer
     for i=2:n+1, j in dd.layers[i]
         temp_v = -Inf
         temp_p = 0
@@ -53,7 +59,7 @@ function longest_path(dd::DecisionDiagram, func::Array{Function})
 
     lp = Array{Int}()
     p = terminal_ind
-    #computing the arc labels on the longest path through a backward search
+    #computing the arc labels on the longest path through a backtracking
     for i=n:-1:1
         # push!(lp, get_node_obj_label(dd, p))
         push!(lp, node_obj_labels[p])
@@ -68,9 +74,11 @@ end
 
 
 """
-Funtion: Second method for function Longest_Path!, where the separable functions are linear for all variables.
-Input: The DD, and an array of coefficient of the variables in the linear objective function
-Output: The longest path (composed of arc labels), and its length
+Second method for function Longest_Path, where weight functions are linear for all variables.
+
+# Input
+- `dd::DecisionDiagram`: The DD.
+- `cf::Array{T} where T<:Real`: An array of coefficients of the variables in the linear objective function
 """
 function longest_path(dd::DecisionDiagram, cf::Array{T} where T<:Real)
     func = Array{Function}(length(cf))

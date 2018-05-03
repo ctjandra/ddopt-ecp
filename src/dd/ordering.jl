@@ -25,6 +25,16 @@ end
 
 function FixedOrdering(fixed_ordering::Array{Int})
     # Check if the ordering is a valid permutation
+    if !isperm(fixed_ordering)
+            error("Invalid fixed ordering")
+    end
+    return new(fixed_ordering)
+end
+
+"""
+#Alternative definition for FixedOrdering
+function FixedOrdering(fixed_ordering::Array{Int})
+    # Check if the ordering is a valid permutation
     n = length(fixed_ordering)
     ordering_check = zeros(n)
     for v in fixed_ordering
@@ -38,6 +48,7 @@ function FixedOrdering(fixed_ordering::Array{Int})
     end
     return new(fixed_ordering)
 end
+"""
 
 function get_var(ordering::FixedOrdering, layer::Int)
     return ordering.fixed_ordering[layer]

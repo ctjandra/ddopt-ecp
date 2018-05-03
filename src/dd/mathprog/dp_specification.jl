@@ -1,17 +1,17 @@
 # DP formulation for additively separable constraints
 # State is Array{Real}: right-hand sides of constraints
 
-include("mathprog_eval.jl")
+include("decomposition.jl")
 
-"""^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Transition function for additively separable constraints
+"""
+    create_constraint_transition_function(evals::SeparableFunctionEvaluation, doms::Array{Range}, ords::Ordering)
 
-Input:
-evals: An array of decomposed terms of a constraint
-doms: Array of range representing domain of variables
-ords: Function for ordering of the variables
+Compute transition function for additively separable constraints.
 
-Output: Transition function
+# Input:
+- `evals`: An array of decomposed terms of a constraint.
+- `doms`: Array of range representing domain of variables.
+- `ords`: Function for ordering of the variables.
 """
 function create_constraint_transition_function(evals::SeparableFunctionEvaluation, doms::Array{Range}, ords::Ordering)
 	@assert(length(doms) == length(ords)) # number of variables are consistent
@@ -55,11 +55,11 @@ function create_constraint_transition_function(evals::SeparableFunctionEvaluatio
 end
 
 
-"""^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Initial state for additively separable constraints
+"""
+Compute initial state for additively separable constraints.
 
-Input:
-evals: An array of decomposed terms of a constraint
+# Input:
+- `evals`: An array of decomposed terms of a constraint.
 
 """
 function create_constraint_initial_state(evals::SeparableFunctionEvaluation)::Real
@@ -67,14 +67,14 @@ function create_constraint_initial_state(evals::SeparableFunctionEvaluation)::Re
 end
 
 
-"""^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Domain function for additively separable constraints
+"""
+Compute domain range for additively separable constraints based on a given math prog model.
 
-Input:
-m: math prog model
+# Input:
+- `m`: math prog model.
 
-Output:
-domain function that takes a variable index and returns the domain as range
+# Output:
+- An array whose elements return the domain range of variables.
 """
 function create_constraint_domain_function(m::Model)
 	nvars = MathProgBase.numvar(m)

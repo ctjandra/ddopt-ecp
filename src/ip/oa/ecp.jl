@@ -1,29 +1,28 @@
-include("../dd/dd.jl")
+include("../../dd/construction.jl")
 include("../cut/cutgenerator.jl")
 
 """
-ECP: function to perform ECP with the DD cuts
+Perform ECP using DD cuts.
 
-Input:
-n: Number of variables
-m: The current model to which the cuts will be added
-dd_list: An array of decision diagrams corresponding to inequalities
-con_list: An array of the functions defining the inequalities
-rhs_list: An array of the rhs value sof inequalities
+# Input
+- `n::Int64`: Number of variables.
+- `m::JuMP.Model`: The current model to which the cuts will be added.
+- `dd_list::Array{DecisionDiagram}`: An array of decision diagrams corresponding to inequalities of the current model.
+- `con_list::Array{SeparableFunctionEvaluation}`: An array of constraint specifications in one-to-one correspondence with the DD array.
 
-Output:
-m_output: The model after addition of cuts
-x_output: Optimal solution
-obj_output: Optimal value
-status_output: Status of the output model
+# Output
+- `m_output`: The model after the addition of cuts.
+- `x_output`: Optimal solution.
+- `obj_output`: Optimal value.
+- `status_output`: Status of the output model.
 """
 
-function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list::Array{Function}, rhs_list::Array{T} where T<:Real)
+function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list::Array{SeparableFunctionEvaluation})
 
     #stopping criteria for the ECP algorithm
     iter_max_ecp = 100      #the maximum number of iterations to execute the algorithm
     tolerance_ecp = 0.05    #the tolerance for relative error
-    tol_num_ecp = 5         #the number of past objective values wrt which the tolerance is computed. This number includes the current objective value
+    tol_num_ecp = 5         #the number of past objective values (including the current one) wrt which the tolerance is computed.
     obj_history_ecp = zeros(tol_num_ecp)    #the vector that stores the previous (improved) objective values for tolerance check
 
     #function to define what stopping criterion must be used:
@@ -37,7 +36,7 @@ function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list:
                 p = p && iter_ecp <= iter_max_ecp
             end
             if v == 1       #uses the objective improvement criterion
-                if cut_added   #if a cut has been added to the model, the obj_history vector must be updated and the criterion is checked
+                if cut_added   #if a cut has been added to the model, the "obj_history_ecp" vector must be updated and the criterion is checked
                     push!(obj_history_ecp, obj_val)
                     deleteat!(obj_history_ecp, 1)
                     p = p && (obj_val - obj_history_ecp[1])/(abs(obj_val) + 1e-5) > tolerance_ecp
@@ -49,14 +48,14 @@ function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list:
 
     #*******************************************************************************
     m2 = copy(m)
-    x = getindex(m2,:x)     #to be able to use the same variables for the new model
+    x = getindex(m2,:x)     #enable to use the same variables of the orignal model for the new model
 
 
     #initialization
     cut_technique = 1       #1:subgradient, 2:CGLP
     max_cut_num = 1     #maximum number of cuts (corresponding to violated inequalities) to be added at each iteration
     subgrad_start_point = zeros(con_num,n)  #stores the starting point for each constraint to be used in the subgradient method
-    st_rule = [1, 2]        #determines the stop rule
+    st_rule = [1, 2]        #determines the stopping rule
     cut_added = false       #indicates if a cut (any type) has been added to the model
     con_num = length(rhs_list)          #the number of constraint
     violation_val = Array{Float64}(con_num)     #stores the violation value for each constraint at the current point
@@ -72,12 +71,12 @@ function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list:
     status_output = :NOToptimal
 
     #************************************************************
-    #performing the ecp method until the stop criteria is met
+    #performing the ecp method until the stopping criteria is met
     while stop_rule_ecp(st_rule)
 
         #computing the violation value of the current point at each constraint
         for i=1:con_num
-            violation_val[i] = con_list[i](x_val) - rhs_list[i]
+            violation_val[i] = con_list[i].single_function(x_val) + con_list[i].constant
         end
 
         sort_ind = sortperm(violation_val)     #stores the indices of the ascending sorted elements of violation_val
@@ -89,7 +88,7 @@ function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list:
         end
 
         cut_num = 0       #number of cuts added so far
-        CGLP_cut = false    #CGLP cut has been added?
+        CGLP_cut = false    #CGLP cut has been added
         subgrad_cut = false     #subgradient cut has been added
         cut_added = false      #any cut has been added
 

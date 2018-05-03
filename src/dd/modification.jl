@@ -1,19 +1,5 @@
 using LightGraphs, MetaGraphs
 
-"""Problem specifications required to construct decision diagram"""
-struct ProblemSpecs
-	initial_state::Any               # Initial state at the root
-	transition_function::Function    # Transition function of DP formulation
-	domain_function::Function        # Function providing domain for each variable
-end
-
-"""Decision diagram structure"""
-mutable struct DecisionDiagram
-	graph::MetaDiGraph
-    layers::Array{Array{Int}}
-end
-
-DecisionDiagram(nvars::Int) = DecisionDiagram(MetaDiGraph(), [[] for i=1:nvars+1])
 
 """Attach a value to a decision diagram node"""
 set_node_value!(dd::DecisionDiagram, node::Int, key::Symbol, value::Any) = set_prop!(dd.graph, node, key, value)
@@ -58,22 +44,24 @@ get_arc_value(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int6
 
 
 # Helper functions to obtain properties of arcs
-set_arc_label!(dd::DecisionDiagram, node1::Int, node2::Int, value::Number) = set_prop!(dd.graph, Edge(node1, node2), :label, value)
+#NOTE: arc labels are stored in arrays
+set_arc_label!(dd::DecisionDiagram, node1::Int, node2::Int, value::Array{T} where T<:Number) = set_prop!(dd.graph, Edge(node1, node2), :label, value)
 get_arc_label(dd::DecisionDiagram, node1::Int, node2::Int) = get_prop(dd.graph, Edge(node1, node2), :label)
 set_arc_layer!(dd::DecisionDiagram, node1::Int, node2::Int, value::Int) = set_prop!(dd.graph, Edge(node1, node2), :layer, value)	#layer of an arc is computed wrt the head node (this definition accounts for long arcs)
 get_arc_layer(dd::DecisionDiagram, node1::Int, node2::Int) = get_prop(dd.graph, Edge(node1, node2), :layer)
 #method to operate on edge directly
-set_arc_label!(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}, value::Number) = set_prop!(dd.graph, arc, :label, value)
+set_arc_label!(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}, value::Array{T} where T<:Number) = set_prop!(dd.graph, arc, :label, value)
 get_arc_label(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}) = get_prop(dd.graph, arc, :label)
 set_arc_layer!(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}, value::Int) = set_prop!(dd.graph, arc, :layer, value)	#layer of an arc is computed wrt the head node (this definition accounts for long arcs)
 get_arc_layer(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}) = get_prop(dd.graph, arc, :layer)
 
 
 # Non-essential properties that are common
-set_arc_weight!(dd::DecisionDiagram, node1::Int, node2::Int, value::Number) = set_prop!(dd.graph, Edge(node1, node2), :weight, value)
+#NOTE: arc labels are stored in arrays, one weight for each arc label
+set_arc_weight!(dd::DecisionDiagram, node1::Int, node2::Int, value::Array{T} where T<:Number) = set_prop!(dd.graph, Edge(node1, node2), :weight, value)
 get_arc_weight(dd::DecisionDiagram, node1::Int, node2::Int) = get_prop(dd.graph, Edge(node1, node2), :weight)
 #method to operate on edge directly
-set_arc_weight!(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}, value::Number) = set_prop!(dd.graph, arc, :weight, value)
+set_arc_weight!(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}, value::Array{T} where T<:Number) = set_prop!(dd.graph, arc, :weight, value)
 get_arc_weight(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}) = get_prop(dd.graph, arc, :weight)
 
 

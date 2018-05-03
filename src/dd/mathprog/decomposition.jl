@@ -3,7 +3,12 @@
 import Base.Cartesian.lreplace
 
 
-"""Given an array of expressions, returns the array of negation of expressions"""
+"""
+Return the array of negation of expressions.
+
+# Input
+- `exprs::Array`: An array of expressions.
+"""
 function negate_exprs(exprs::Array)::Array
     negated_exprs = []
     for expr in exprs
@@ -17,7 +22,9 @@ function negate_exprs(exprs::Array)::Array
 end
 
 
-"""Return the variable indices involved in an expression"""
+"""
+Return the variable indices involved in an expression.
+"""
 function get_vars_expr(expr::Expr)
     vars = Set()
     exprs_to_process = [expr]               #stores remaining (sub)expressions in expr that need to be preocessed
@@ -43,14 +50,12 @@ end
 
 
 
-"""Decomposes a given expression into separable terms.
+"""
+Decompose a given expression into separable terms.
 
-Input:
-expr: the expression.
-
-Output:
-An array that stores decomposed parts (expressions) of the constraint.
-These parts are separated by + sing, e.g., 3x[1] - x[1]^2 + sin(x[2]) - 4 <= 0, will be stored in an array with 4 elements for the lhs.
+# Output:
+- An array that stores decomposed parts (expressions) of a given expression.
+These parts are separated by ``+`` sign, e.g., ``3x[1] - x[1]^2 + sin(x[2]) - 4 <= 0``, will be stored in an array with 4 elements for the lhs.
 If the constraint is not additively separable, throws error.
 """
 
@@ -102,7 +107,7 @@ end
 
 
 """
-Function: Returns the sense of a given expression in form of an (in)equality.
+Return the sense of a given expression in form of an (in)equality.
 Returns error if the expression is not (in)equality
 """
 
@@ -118,7 +123,9 @@ end
 #************************************************************************
 #*************************************************************************
 #*************************************************************************
-"""Evaluate a univariate expression replacing the variable by the given value"""
+"""
+Evaluate a univariate expression replacing the variable by the given value.
+"""
 function eval_var(expr::Expr, val::Real)
     # Replace references by the value
     if expr.head == :ref        #if the expression is composed of a single variable assigns the value
@@ -152,16 +159,7 @@ TODO: Another method to evaluate a given expression, where we allow several vari
 
 
 """
-Function: calculates min and max value of a univariate expression over a given domain
-
-Input:
-expr: Expression
-lb: lower bound
-ub: upper bound
-
-Output:
-min_val
-max_val
+Calculate min and max value of a univariate expression over a given domain.
 """
 function min_max_calculator(expr::Expr, doms::Array{Range})
     min_val = Inf
@@ -189,27 +187,23 @@ end
 
 
 
-"""Oracle that yields decomposition terms of a given function"""
+"""
+Oracle that yields functional specifications of a constraint.
+"""
 mutable struct SeparableFunctionEvaluation
-    separate_exprs::Array{Expr}     # each element stores the univariate expression for a variable
+#    separate_exprs::Array{Expr}     # each element stores the univariate expression for a variable
+    single_function::Function       # evaluate the whole multivariate function in the constraint at any point (without the constant part)
     separate_functions::Array{Function} # each element stores the univariate function for a variable
     constant::Real         # constant term of function
-#    values::Array{Dict}    # values of each term per variable-value pair, each element corresponding to a variable (depends on the variables domain)
-#    max_vals::Array{Real}  # maximum values of each term per variable (depends on the variables domain)
-#    min_vals::Array{Real}  # minimum values of each term per variable (depends on the variables domain)
 end
 
 
 """
-Function: Returns decomposition terms of constraints of a model
+Return decomposition terms of constraints of a model.
 
-Input:
-m: the model
-
-Output:
-evals: An array of function specifications for constraints
+# Output
+- `evals`: An array of instances that store function specification for constraints
 """
-
 function evaluate_separable_constraints(m::Model)::Array{SeparableFunctionEvaluation}
     d = JuMP.NLPEvaluator(m)        #obtains an NLP evaluator object from a JuMP model, which enables query of function characteristics in the model
     MathProgBase.initialize(d, [:ExprGraph])    #enables query of the functions of the model in their expression graph form
@@ -254,40 +248,18 @@ function evaluate_separable_constraints(m::Model)::Array{SeparableFunctionEvalua
         function_parts = Array{Function}(nvars)
         for j in 1:nvars
             if isassigned(var_parts, j)
-                function_parts[j] = (xx::Int64) -> eval_var(var_parts[j], xx)
+                function_parts[j] = (x::Real) -> eval_var(var_parts[j], x)
             end
         end
 
-        #Computes the attributes corresponding to function value over variable domain
-        #Assumes the domain consists of all integer values within the bounds of the variable
-        """
-        constr_evals = Array{Dict}(nvars)
-        min_evals = Array{Real}(nvars)
-        max_evals = Array{Real}(nvars)
-        for v in 1:nvars
-            var = Variable(m, v)
-            lb = ceil(Int, getlowerbound(var))
-            ub = floor(Int, getupperbound(var))
-            if !isassigned(var_parts, v)
-                constr_evals[v] = Dict(j => 0 for j in lb:ub)
-                min_evals[v] = 0
-                max_evals[v] = 0
-            else
-                constr_evals[v] = Dict()
-                min_eval = Inf
-                max_eval = -Inf
-                for j in lb:ub
-                    val = eval_var(var_parts[v], j)
-                    min_eval = min(val, min_eval)
-                    max_eval = max(val, max_eval)
-                    constr_evals[v][j] = val
-                end
-                min_evals[v] = min_eval
-                max_evals[v] = max_eval
-            end
+        # Create a single multivariate function representing lhs of a constraint
+        single_function = function (x::Array{T} where T<:Real)
+            @assert(length(x) == nvars)
+            sum_v = sum(function_parts[j](x[j]) for j in 1:nvars if isassigned(var_parts, j))
+            return sum_v
         end
-        """
-        evals[i] = SeparableFunctionEvaluation(var_parts, function_parts, constant, constr_evals, min_evals, max_evals)
+
+        evals[i] = SeparableFunctionEvaluation(single_function, function_parts, constant)
 
     end
 
