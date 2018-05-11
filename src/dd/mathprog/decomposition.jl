@@ -2,6 +2,8 @@
 
 import Base.Cartesian.lreplace
 
+using JuMP
+
 
 """
 Return the array of negation of expressions.
@@ -113,7 +115,7 @@ Returns error if the expression is not (in)equality
 
 function get_constraint_sense(expr::Expr)
     if expr.head == :call && expr.args[1] in [:(<=), :(==), :(>=)]
-        return a.args[1]            #Sybmbol for the (in)equality sense
+        return expr.args[1]            #Symbol for the (in)equality sense
     else
         error("Expression not in constraint form (", expr, ")")
     end
@@ -153,15 +155,13 @@ function eval_var(expr::Expr, val::Real)
     end
 end
 
-"""
-TODO: Another method to evaluate a given expression, where we allow several variables (for nonseparable case!)
-"""
+# TODO: Another method to evaluate a given expression, where we allow several variables (for nonseparable case!)
 
 
 """
 Calculate min and max value of a univariate expression over a given domain.
 """
-function min_max_calculator(expr::Expr, doms::Array{Range})
+function min_max_calculator(expr::Expr, doms::Range)
     min_val = Inf
     max_val = -Inf
     for j in doms
@@ -173,7 +173,7 @@ function min_max_calculator(expr::Expr, doms::Array{Range})
 end
 
 #An alternative method, where it takes a univarate function as input and computes the min and max over given domain
-function min_max_calculator(func::Function, doms::Array{Range})
+function min_max_calculator(func::Function, doms::Range)
     min_val = Inf
     max_val = -Inf
     for j in doms
@@ -214,6 +214,7 @@ function evaluate_separable_constraints(m::Model)::Array{SeparableFunctionEvalua
     evals = Array{SeparableFunctionEvaluation}(nconstrs)
 
     for i in 1:nconstrs
+        # TODO: Store ConstraintRefs
         expr = MathProgBase.constr_expr(d, i)       #gets the expression of the ith constraint
         parts = separate_additively(expr)         #gets the array of decomposed part of the constraint
 

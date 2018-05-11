@@ -1,12 +1,11 @@
 include("../../../src/Dexter.jl")
 using Dexter
 
+using LightGraphs
 using Gadfly
 using GraphPlot
 using JuMP
 using Clp
-
-include("mathprog.jl")
 
 m = Model(solver = ClpSolver())
 @variable(m, 0 <= x <= 5)
@@ -19,24 +18,28 @@ m = Model(solver = ClpSolver())
 # @NLconstraint(m, cos(x) * e^(-x^2) + y - x*x + -(x/2 + 2*y) + 1 <= x^2 + 5)
 # @NLconstraint(m, 2x <= 3.0 )
 # @NLconstraint(m, x + y + z <= 8)
-@NLconstraint(m, - 2 * x * e^(-x) - 5 * y * e^(-y^2) - 3 * z * e^(-z) <= 30)
+# @NLconstraint(m, - 2 * x * e^(-x) - 5 * y * e^(-y^2) - 3 * z * e^(-z) <= 30)
+@NLconstraint(m, 2 * x * e^(-x) + 5 * y * e^(-y^2) + 3 * z * e^(-z) <= 3)
 
 print(m)
 
 # TODO: Right now we are assuming <=. Consider >= case.
 
 # Compute evaluations of parts of additively separable constraints
-evals = evaluate_separable_constraints(m)
+evals = Dexter.evaluate_separable_constraints(m)
 
-# Create specs for decision diagram
-initial_state = create_mathprog_initial_state(evals)
-transition = create_mathprog_transition_function(evals)
-domain_function = create_mathprog_domain_function(m)
-mathprog_specs = Dexter.ProblemSpecs(initial_state, transition, domain_function)
+# TODO: Transition function should support dynamic ordering
 
 # Set ordering and objective
 n = MathProgBase.numvar(m)
 ordering = Dexter.NoOrdering()
+
+# Create specs for decision diagram
+eval = evals[1]
+initial_state = Dexter.create_constraint_initial_state(eval)
+domains = Dexter.create_constraint_domain_function(m)
+transition = Dexter.create_constraint_transition_function(eval, domains, ordering)
+mathprog_specs = Dexter.ProblemSpecs(initial_state, transition, domains)
 
 # Construct decision diagram
 dd = Dexter.construct_DD(n, mathprog_specs, ordering=ordering)

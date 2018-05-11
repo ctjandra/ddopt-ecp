@@ -1,4 +1,4 @@
-include("dd.jl")
+include("construction.jl")
 
 """
 Find a longest path on DD.

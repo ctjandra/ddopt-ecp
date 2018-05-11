@@ -14,7 +14,6 @@ Compute transition function for additively separable constraints.
 - `ords`: Function for ordering of the variables.
 """
 function create_constraint_transition_function(evals::SeparableFunctionEvaluation, doms::Array{Range}, ords::Ordering)
-	@assert(length(doms) == length(ords)) # number of variables are consistent
 	n = length(doms)	# number of variables
 	min_ahead = Array{Real}(n)		# For each variable, stores the minimum value that can be obtained starting from the next layer to the terminal
 	max_ahead = Array{Real}(n)		# For each variable, stores the maximum value that can be obtained starting from the next layer to the terminal
@@ -59,10 +58,10 @@ end
 Compute initial state for additively separable constraints.
 
 # Input:
-- `evals`: An array of decomposed terms of a constraint.
+- `eval`: Decomposed terms of a constraint.
 
 """
-function create_constraint_initial_state(evals::SeparableFunctionEvaluation)::Real
+function create_constraint_initial_state(eval::SeparableFunctionEvaluation)::Real
     return eval.constant  	# constant value of the constraint as moved to lhs of <= constraints
 end
 

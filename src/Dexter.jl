@@ -7,7 +7,10 @@ module Dexter
 
     include("dd/ordering.jl")
     include("dd/construction.jl")
-    include("dd/functions.jl")
+    include("dd/computation.jl")
 
-    include("cut/cutgenerator.jl")
+    include("dd/mathprog/decomposition.jl")
+    include("dd/mathprog/dp_specification.jl")
+
+    include("ip/cut/cutgenerator.jl")
 end
