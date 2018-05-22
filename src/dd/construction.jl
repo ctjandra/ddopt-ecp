@@ -24,16 +24,13 @@ end
 
 
 
-"""^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Function: Construct a decision diagram.
+"""
+Construct a decision diagram.
 
-Input:
-n: Number of variables (arc layers)
-problem: Problem specification (initial state, transition function, domain function) based on DP formulation of the problem
-ordering: Ordering of the variables in DD
-
-Output:
-Constructed DD
+# Input
+- `n`: Number of variables (arc layers).
+- `problem`: Problem specification (initial state, transition function, domain function) based on DP formulation of the problem.
+- `ordering`: Ordering of the variables in DD.
 """
 function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrdering())
 

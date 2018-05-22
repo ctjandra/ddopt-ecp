@@ -7,9 +7,9 @@ function read_graph(filename::AbstractString)::Graph
 	f = open(filename)
 	g = nothing
 	for line in eachline(f)
-		pieces = split(line)
+		pieces = split(line)			#split strings into pieces separated by space (default delimiter)
 		if pieces[1] == "p"
-			nvertices = parse(Int, pieces[3])
+			nvertices = parse(Int, pieces[3])		#converts string to int values
 			g = Graph(nvertices)
 		elseif pieces[1] == "e"
 			if g == nothing
