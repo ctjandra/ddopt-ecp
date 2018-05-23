@@ -20,14 +20,14 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 
 	line = readline(f)
 	var_num = parse(Int, line)		#number of variables
-	readfile(f)					#an empty line
+	readline(f)					#an empty line
 
-	readfile(f)					#total number of constraints
-	readfile(f)
+	readline(f)					#total number of constraints
+	readline(f)
 
 	line = readline(f)
 	pricing_constr_num = parse(Int, line)		#number of pricing constraints
-	readfile(f)
+	readline(f)
 
 	line = readline(f)
 	pieces = split(line)					#split strings into pieces separated by space (default delimiter)
@@ -36,7 +36,7 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	for i=1:var_num
 		lb[i] = parse(Int, pieces[i])		#lower bound vector
 	end
-	readfile(f)
+	readline(f)
 
 	line = readline(f)
 	pieces = split(line)
@@ -45,7 +45,7 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	for i=1:var_num
 		ub[i] = parse(Int, pieces[i])		#upper bound vector
 	end
-	readfile(f)
+	readline(f)
 
 	line = readline(f)
 	pieces = split(line)
@@ -54,7 +54,7 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	for i=1:var_num
 		obj_c[i] = parse(Float64, pieces[i])		#objective function coefficients
 	end
-	readfile(f)
+	readline(f)
 
 	line = readline(f)
 	pieces = split(line)
@@ -63,29 +63,29 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	for i=1:var_num
 		obj_d[i] = parse(Float64, pieces[i])		#objective function degree of variables
 	end
-	readfile(f)
+	readline(f)
 
-	constr_c = Array{Float64}(var_num,pricing_constr_num)
+	constr_c = Array{Float64}(pricing_constr_num, var_num)
 	for i=1:pricing_constr_num
 		line = readline(f)
 		pieces = split(line)
 		@assert(length(pieces) == var_num)
 		for j=1:var_num
-			constr_c[i][j] = parse(Float64, pieces[j])		#coefficient of variable j in constraint i
+			constr_c[i,j] = parse(Float64, pieces[j])		#coefficient of variable j in constraint i
 		end
 	end
-	readfile(f)
+	readline(f)
 
-	constr_d = Array{Float64}(var_num,pricing_constr_num)
+	constr_d = Array{Float64}(pricing_constr_num, var_num)
 	for i=1:pricing_constr_num
 		line = readline(f)
 		pieces = split(line)
 		@assert(length(pieces) == var_num)
 		for j=1:var_num
-			constr_d[i][j] = parse(Float64, pieces[j])		#degree of the exp power for variable j in constraint i
+			constr_d[i,j] = parse(Float64, pieces[j])		#degree of the exp power for variable j in constraint i
 		end
 	end
-	readfile(f)
+	readline(f)
 
 	line = readline(f)
 	pieces = split(line)
@@ -94,9 +94,9 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	for i=1:pricing_constr_num
 		constr_rhs[i] = parse(Float64, pieces[i])		#rhs value of constraints
 	end
-	readfile(f)
+	readline(f)
 
-	price_spec = PricingSpecs(var_num, pricing_constr_num, lb, ub, obj_c, obj_d,	constr_c, constr_d, constr_rhs)	#create an instance of PricingSpecs from the read data
+	price_spec = PricingSpecs(var_num, pricing_constr_num, lb, ub, obj_c, obj_d, constr_c, constr_d, constr_rhs)	#create an instance of PricingSpecs from the read data
 	return price_spec
 
 end
@@ -121,7 +121,7 @@ function create_pricing_model(pricing_spec::PricingSpecs)::JuMP.Model
 	obj = AffExpr(x, pricing_spec.obj_c, 0.0)			#the objective function is linear
 	@objective(m, Min, obj)
 
-	@NLconstraint(m, pricing_constr[i=1:pricing_spec.pricing_constr_num], sum(pricing_spec.constr_c[i][j]*e^(-x[j]^pricing_spec.constr_d[i][j]) for j=1:pricing_spec.var_num) <= pricing_spec.constr_rhs[j])
+	@NLconstraint(m, pricing_constr[i=1:pricing_spec.pricing_constr_num], sum(pricing_spec.constr_c[i,j]*e^(-x[j]^pricing_spec.constr_d[i,j]) for j=1:pricing_spec.var_num) <= pricing_spec.constr_rhs[i])
 
 	return m
 

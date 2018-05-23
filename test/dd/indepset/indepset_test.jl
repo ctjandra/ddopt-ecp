@@ -8,7 +8,7 @@ include("read_graph.jl")
 include("indepset.jl")
 
 # Generate graph
-# g = read_graph("test/dd/indepset/instances/random_200_50_0.clq")
+# g = read_graph(joinpath(@__DIR__, "instances", "random_200_50_0.clq"))
 # g = PathGraph(10)
 # g = erdos_renyi(20, 0.5)
 g = erdos_renyi(50, 0.5)
