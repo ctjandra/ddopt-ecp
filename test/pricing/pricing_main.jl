@@ -28,7 +28,7 @@ n = MathProgBase.numvar(m)
 ordering = Dexter.NoOrdering()
 
 # Create specs for decision diagram
-eval = evals[7]
+eval = evals[2]
 initial_state = Dexter.create_constraint_initial_state(eval)
 domains = Dexter.create_constraint_domain_function(m)
 transition = Dexter.create_constraint_transition_function(eval, domains, ordering)
