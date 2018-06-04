@@ -81,6 +81,9 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 				continue
 			end
 
+			#new_state = floor(new_state)
+			new_state = floor(10*new_state)/10		# rounds down the fractional state values: ONLY use to construct RELAXED DD when state values are fractional, e.g., for the pricing problem
+
 			next_layer = layer + 1
 			states_to_nodes = layer_states[next_layer]
 

@@ -13,5 +13,5 @@ module Dexter
     include("dd/mathprog/decomposition.jl")
     include("dd/mathprog/dp_specification.jl")
 
-    include("ip/cut/cutgenerator.jl")
+    include("ip/oa/ecp.jl")
 end
