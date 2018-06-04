@@ -1,4 +1,4 @@
-include("construction.jl")
+include_dependency("construction.jl")
 
 """
 Find a longest path on DD.
@@ -13,7 +13,7 @@ Find a longest path on DD.
 """
 function longest_path(dd::DecisionDiagram, func::Array{Function})
 
-    n = size(dd.layers, 1) - 1     #the number of arc layers of dd
+    n = nvars(dd)
     @assert(n == length(func))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
 
     g = dd.graph
@@ -23,7 +23,7 @@ function longest_path(dd::DecisionDiagram, func::Array{Function})
     #getting the index of the source and the terminal node
     source_ind = dd.layers[1][1]            #gets the index value of the source node
 
-    node_obj_vals = Array{Real}(node_num)   #stores the maximum objective value computed from the source to each node
+    node_obj_vals = Array{Float64}(node_num)   #stores the maximum objective value computed from the source to each node
     node_obj_paths = Array{Int}(node_num)   #at each node, stores the index of the previous node of longest path from source to that node
     node_obj_labels = Array{Int}(node_num)  #stores the label value of the last arc of the longest path from source to each node
 
@@ -78,9 +78,9 @@ Second method for function Longest_Path, where weight functions are linear for a
 
 # Input
 - `dd::DecisionDiagram`: The DD.
-- `cf::Array{T} where T<:Real`: An array of coefficients of the variables in the linear objective function
+- `cf::Array{T} where T<:Float64`: An array of coefficients of the variables in the linear objective function
 """
-function longest_path(dd::DecisionDiagram, cf::Array{T} where T<:Real)
+function longest_path(dd::DecisionDiagram, cf::Array{T} where T<:Float64)
     func = Array{Function}(length(cf))
     for (i, c) in enumerate(cf)                 #creates an array of separable functions for each variable
         func[i] = (x::Int64) -> c*x

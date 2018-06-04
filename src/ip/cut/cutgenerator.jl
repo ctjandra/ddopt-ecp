@@ -1,6 +1,6 @@
-include("../../dd/construction.jl")
-include("../../dd/modification.jl")
-include("../../dd/computation.jl")
+include_dependency("../../dd/construction.jl")
+include_dependency("../../dd/modification.jl")
+include_dependency("../../dd/computation.jl")
 
 using JuMP, Clp, CPLEX
 

@@ -1,7 +1,7 @@
 # DP formulation for additively separable constraints
 # State is Array{Real}: right-hand sides of constraints
 
-include("decomposition.jl")
+include_dependency("decomposition.jl")
 
 """
     create_constraint_transition_function(evals::SeparableFunctionEvaluation, doms::Array{Range}, ords::Ordering)
@@ -15,8 +15,8 @@ Compute transition function for additively separable constraints.
 """
 function create_constraint_transition_function(evals::SeparableFunctionEvaluation, doms::Array{Range}, ords::Ordering)
 	n = length(doms)	# number of variables
-	min_ahead = Array{Real}(n)		# For each variable, stores the minimum value that can be obtained starting from the next layer to the terminal
-	max_ahead = Array{Real}(n)		# For each variable, stores the maximum value that can be obtained starting from the next layer to the terminal
+	min_ahead = Array{Float64}(n)		# For each variable, stores the minimum value that can be obtained starting from the next layer to the terminal
+	max_ahead = Array{Float64}(n)		# For each variable, stores the maximum value that can be obtained starting from the next layer to the terminal
 
 	#initialize values for the last layer
 	min_ahead[get_var(ords,n)] = 0

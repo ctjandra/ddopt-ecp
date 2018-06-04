@@ -3,6 +3,7 @@
 import Base.Cartesian.lreplace
 
 using JuMP
+using Memoize
 
 
 """
@@ -66,7 +67,7 @@ separate_additively(expr::Real)::Array = [expr]
 function separate_additively(expr::Expr)::Array
     # Examine the expression tree: first split (in)equalities and then check if
     # each term separated by a + or - uses only one type of variable
-    println(expr.head, " -- ", expr.args, " -- ", expr.typ)
+    # println(expr.head, " -- ", expr.args, " -- ", expr.typ)
     if expr.head == :call
         # println("Call")
         # (In)equality or non-unary -
@@ -125,10 +126,9 @@ end
 #************************************************************************
 #*************************************************************************
 #*************************************************************************
-"""
-Evaluate a univariate expression replacing the variable by the given value.
-"""
-function eval_var(expr::Expr, val::Real)
+
+# Evaluate a univariate expression replacing the variable by the given value.
+@memoize function eval_var(expr::Expr, val::Real)
     # Replace references by the value
     if expr.head == :ref        #if the expression is composed of a single variable assigns the value
         return val
