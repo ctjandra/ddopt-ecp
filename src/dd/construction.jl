@@ -1,4 +1,4 @@
-include("ordering.jl")
+include_dependency("ordering.jl")
 
 using LightGraphs, MetaGraphs
 
@@ -12,7 +12,11 @@ end
 
 DecisionDiagram(nvars::Int) = DecisionDiagram(MetaDiGraph(), [[] for i=1:nvars+1])
 
+"""Return the number of node layers in the decision diagram"""
+nlayers(dd::DecisionDiagram) = size(layers)
 
+"""Return the number of variables (or number of arc layers) in the decision diagram"""
+nvars(dd::DecisionDiagram) = size(layers) - 1
 
 
 """Problem specifications required to construct decision diagram"""
@@ -66,7 +70,7 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 		state = get_node_state(dd, node)
 		var = get_var(ordering, layer)
 
-		# println("Layer $(layer): exploring $(node)")
+		# println("Layer $(layer): exploring $(node) with state $(state)")
 
 		# Create children
 		for val in problem.domain_range[var]
