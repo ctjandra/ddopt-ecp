@@ -10,6 +10,7 @@ Generate CGLP cuts.
 # Input
 - `dd::DecisionDiagram`: DD.
 - `fractional_point::Array{Float64}`: The point to be separated (as a vector).
+- `tilim::Float64`: Time limit in seconds (optional).
 
 # Output
 - `obj`: The optimal value of the CGLP.
@@ -17,7 +18,7 @@ Generate CGLP cuts.
 - `rhs`: The right-hand-side of the cut.
 - `status`: The status of the CGLP.
 """
-function CGLP(dd::DecisionDiagram, fractional_point::Array{Float64})
+function CGLP(dd::DecisionDiagram, fractional_point::Array{Float64}; tilim::Float64 = 100000)
 
     n = size(dd.layers, 1) - 1     #the number of arc layers of dd
     @assert(n == length(fractional_point))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
@@ -27,7 +28,7 @@ function CGLP(dd::DecisionDiagram, fractional_point::Array{Float64})
     arc_num = ne(g)
 
     #Preparing an optimization model
-    m = Model(solver = CplexSolver())
+    m = Model(solver = CplexSolver(CPX_PARAM_TILIM = tilim))
 
     #defining variables
     @variable(m, theta_plus[vertices(g)] >= 0)
@@ -85,23 +86,24 @@ Generate cuts via the subgradient method.
 - `fractional_point::Array{Float64}`: The point to be separated (as a vector).
 - `step_rule::Int64`: Step size rule (optional).
 - `starting_point::Array{Float64}`: Starting point (optional).
+- `tilim::Float64`: Time limit in seconds (optional).
 
 # Output
 - `best_obj`: The optimal value of the subgradient method at termination.
 - `best_coefficients`: The coefficient vector of the best inequality at termination.
 - `best_rhs`: The right-hand-side of the best inequality at termination.
 """
-function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step_rule::Int64 = 0, starting_point::Array{Float64} = zeros(length(fractional_point)))
+function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step_rule::Int64 = 0, starting_point::Array{Float64} = zeros(length(fractional_point)), tilim::Float64 = 100000)
 
     n = size(dd.layers, 1) - 1     #the number of arc layers of dd
     @assert(n == length(fractional_point))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
 
 
-    #Choosing the step rule
-    #0. constant step size: \rho_t = c for some c>0
-    #1. constraint step length: \rho_t = c/||g_t||, where c>0 and g_t is the subgradient at step t
-    #2. diminishing step rule: \rho_t = c/sqrt(t), where c>0
-    #3. square summable diminishing step rule: \rho_t = c/(a+t), where c>0 and a>=0
+    # Choosing the step rule
+    # 0. constant step size: \rho_t = c for some c>0
+    # 1. constraint step length: \rho_t = c/||g_t||, where c>0 and g_t is the subgradient at step t
+    # 2. diminishing step rule: \rho_t = c/sqrt(t), where c>0
+    # 3. square summable diminishing step rule: \rho_t = c/(a+t), where c>0 and a>=0
     if step_rule < 0 || step_rule > 3
         step_rule = 0
         info("Mismatch in the step size rule. The default rule has been used.")
@@ -123,74 +125,82 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step
     end
 
 
-    #initialization
-    best_obj = 0            #best objecive found so far
-    best_coefficients = zeros(n)      #coefficient vector corresponding to the best objective
-    best_rhs = 0            #right-hand-side value corresponding to the best objective
-    delta = 0               #the violation value (objective value)
-    subgrad = ones(n)       #subgradient vector
-    iter = 1                #iteration number
-    stop_criterion = [0]                #stopping criterion
-    if norm(starting_point) > 0         #normalizing the starting point and making a copy
+    # initialization
+    best_obj = 0            # best objecive found so far
+    best_coefficients = zeros(n)      # coefficient vector corresponding to the best objective
+    best_rhs = 0            # right-hand-side value corresponding to the best objective
+    delta = 0               # the violation value (objective value)
+    subgrad = ones(n)       # subgradient vector
+    iter = 1                # iteration number
+    stop_criterion = [0]                # stopping criterion
+    if norm(starting_point) > 0         # normalizing the starting point and making a copy
         gamma = starting_point/norm(starting_point)
     else
         gamma = copy(starting_point)
     end
 
-    #stopping criteria for the entire algorithm
-    iter_max = 100      #the maximum number of iterations to execute the algorithm
-    tolerance = 0.05    #the tolerance for relative error
-    tol_num = 2         #the number of past objective values (including the current one) wrt which the tolerance is computed
-    obj_history = zeros(tol_num)    #stores the previous (improved) objective values for tolerance check
+    # stopping criteria for the entire algorithm
+    iter_max = 20      # the maximum number of iterations to execute the algorithm
+    tolerance = 0.05    # the tolerance for relative error
+    tol_num = 2         # the number of past objective values (including the current one) wrt which the tolerance is computed
+    obj_history = zeros(tol_num)    # stores the previous (improved) objective values for tolerance check
 
-    #function to define what stopping criterion must be used:
-    #0: iteration number
-    #1: concavity error: obtained from the first order concavity inequality over the unit ball normalization constraint: at iteration t, the objective error is <= norm of subgradient - violation value
-    #2: objective improvement: the relative difference between k consequtive improvements
-    function stop_rule(st::Array{Int64})   #multiple stopping criteria can be passed as an array
+    # function to define what stopping criterion must be used:
+    # 0: time
+    # 1: iteration number
+    # 2: concavity error: obtained from the first order concavity inequality over the unit ball normalization constraint: at iteration t, the objective error is <= norm of subgradient - violation value
+    # 3: objective improvement: the relative difference between k consequtive improvements
+    function stop_rule(st::Array{Int64})   # multiple stopping criteria can be passed as an array
         p = true
         for v in st
-            if v == 0       #uses the number of iteration criterion
+            if v == 0         # compares time elapsed with given time limit
+                clock_end = time_ns()
+                time_elapsed = float(clock_end - clock_start)
+                p = p && time_elapsed <= tilim
+            end
+            if v == 1       # uses the number of iteration criterion
                 p = p && iter <= iter_max
             end
-            if v == 1       #uses the concavity error criterion
+            if v == 2       # uses the concavity error criterion
                 p = p && (norm(subgrad) - delta)/(norm(subgrad) + 1e-5) > tolerance
             end
-            if v == 2       #uses the objective improvement criterion
-                if obj_history[end] != best_obj   #if the objective value is updated, the obj_history vector must be updated as well and the criterion is checked
+            if v == 3       # uses the objective improvement criterion
+                if obj_history[end] != best_obj   # if the objective value is updated, the obj_history vector must be updated as well and the criterion is checked
                     push!(obj_history, best_obj)
                     deleteat!(obj_history, 1)
                     p = p && (best_obj - obj_history[1])/best_obj > tolerance
                 end
             end
         end
-        return p    #is false when the stopping criterion is met
+        return p    # is false when the stopping criterion is met
     end
 
+    # initializing time parameter
+    clock_start = time_ns()
 
-    #Main algorithm
+    # Main algorithm
     while stop_rule(stop_criterion)
 
-        #computing the longest path with the objective function defined by the current direction
+        # computing the longest path with the objective function defined by the current direction
         lp1, lpv1 = longest_path(dd, gamma)
 
-        #computing the violatation value of the current inequality at the given fractional point
+        # computing the violatation value of the current inequality at the given fractional point
         delta = gamma'*fractional_point - lpv1
 
         if delta > best_obj
             best_obj = delta
             best_coefficients = gamma
             best_rhs = lpv1
-            stop_criterion= [0,1]          #changes the stop rule to the one that considers both iteration number and concavity error
+            stop_criterion= [0, 1, 2]          #changes the stop rule to the one that considers both iteration number and concavity error
         end
 
-        #computing the subgradient at current iteation
+        # computing the subgradient at current iteation
         subgrad = fractional_point - lp1
 
-        #updating the coefficient vector
+        # updating the coefficient vector
         phi = gamma + rho(iter,norm(subgrad))*subgrad
 
-        #projecting the updated vector onto the unit ball normalization cosntraint
+        # projecting the updated vector onto the unit ball normalization cosntraint
         if norm(phi) > 1
             gamma = phi/norm(phi)
         else

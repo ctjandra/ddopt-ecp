@@ -14,15 +14,15 @@ Read a text file containing pricing problem data. Assumes file is correctly form
 """
 function read_pricing(filename::AbstractString)::PricingSpecs
 	f = open(filename)
-	for i=1:15			#this is the description part of the text file
+	for i=1:15			#this is the description part of the text file, so we skip all these lines
 		readline(f)
 	end
 
 	line = readline(f)
 	var_num = parse(Int, line)		#number of variables
-	readline(f)					#an empty line
+	readline(f)						#an empty line
 
-	readline(f)					#total number of constraints
+	readline(f)					#total number of constraints (no field to assign to, so we skip)
 	readline(f)
 
 	line = readline(f)

@@ -8,7 +8,7 @@ Perform ECP using DD cuts.
 - `n::Int64`: Number of variables.
 - `m::JuMP.Model`: The current model to which the cuts will be added.
 - `dd_list::Array{DecisionDiagram}`: An array of decision diagrams corresponding to inequalities of the current model.
-- `con_list::Array{SeparableFunctionEvaluation}`: An array of constraint specifications in one-to-one correspondence with the DD array.
+- `con_list::Array{SeparableFunctionEvaluation}`: An array of constraint specifications with one-to-one correspondence to the DD array.
 
 # Output
 - `m_output`: The model after the addition of cuts.
@@ -19,49 +19,68 @@ Perform ECP using DD cuts.
 
 function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list::Array{SeparableFunctionEvaluation})
 
-    #stopping criteria for the ECP algorithm
-    iter_max_ecp = 100      #the maximum number of iterations to execute the algorithm
-    tolerance_ecp = 0.05    #the tolerance for relative error
-    tol_num_ecp = 5         #the number of past objective values (including the current one) wrt which the tolerance is computed.
-    obj_history_ecp = zeros(tol_num_ecp)    #the vector that stores the previous (improved) objective values for tolerance check
+    # stopping criteria for the ECP algorithm
+    time_limit = 100        # total time limit for the algorithm
+    iter_max_ecp = 100      # the maximum number of iterations to execute the algorithm
+    tolerance_ecp = 0.05    # the tolerance for relative error
+    tol_num_ecp = 5         # the number of past objective values (including the current one) wrt which the tolerance is computed.
+    obj_history_ecp = zeros(tol_num_ecp)    # the vector that stores the previous (improved) objective values for tolerance check
 
-    #function to define what stopping criterion must be used:
-    #0: iteration number
-    #1: objective improvement: the relative difference between k consequtive improvements
-    #2: error on the optimality gap (TO DO: need a primal heuristic method)
-    function stop_rule_ecp(stp::Array{Int64})   #multiple stopping criteria can be passed as an array
+    # function to define what stopping criterion must be used:
+    # 0: time limit
+    # 1: iteration number
+    # 2: objective improvement: the relative difference between k consequtive improvements
+    # 3: error on the optimality gap (TO DO: need a primal heuristic method)
+    function stop_rule_ecp(stp::Array{Int64})   # multiple stopping criteria can be passed as an array
         p = true
         for v in stp
-            if v == 0       #uses the number of iteration criterion
+            if v ==  0      # time limit criterion
+                clock_end = time_ns()
+                time_elapsed = float(clock_end - clock_start)
+                p = p && time_elapsed <= time_limit
+            end
+            if v == 1       # the number of iteration criterion
                 p = p && iter_ecp <= iter_max_ecp
             end
-            if v == 1       #uses the objective improvement criterion
-                if cut_added   #if a cut has been added to the model, the "obj_history_ecp" vector must be updated and the criterion is checked
+            if v == 2       # uses the objective improvement criterion
+                if cut_added   # if a cut has been added to the model, the `obj_history_ecp` vector must be updated and the criterion is checked
                     push!(obj_history_ecp, obj_val)
                     deleteat!(obj_history_ecp, 1)
                     p = p && (obj_val - obj_history_ecp[1])/(abs(obj_val) + 1e-5) > tolerance_ecp
                 end
             end
         end
-        return p    #is false when the stopping criterion is met
+        return p    # is false when the stopping criterion is met
     end
 
     #*******************************************************************************
     m2 = copy(m)
-    x = getindex(m2,:x)     #enable to use the same variables of the orignal model for the new model
+    x = getindex(m2,:x)     # allows to use the same variables of the orignal model for the new model
 
 
-    #initialization
-    cut_technique = 1       #1:subgradient, 2:CGLP
-    max_cut_num = 1     #maximum number of cuts (corresponding to violated inequalities) to be added at each iteration
-    subgrad_start_point = zeros(con_num,n)  #stores the starting point for each constraint to be used in the subgradient method
-    st_rule = [1, 2]        #determines the stopping rule
-    cut_added = false       #indicates if a cut (any type) has been added to the model
-    con_num = length(rhs_list)          #the number of constraint
-    violation_val = Array{Float64}(con_num)     #stores the violation value for each constraint at the current point
-    iter_ecp = 1                                #iteration counter
+    # initializing cut gnerating paratmeters
+    subgrad_flag = true       # if subgradient method is used to generate cuts
+    CGLP_flag = false             # if CGLP method is used to generate cuts
+    max_cut_num = 10     # maximum number of cuts (one cut for each violated inequality) to be added at each iteration
+    subgrad_start_point = zeros(con_num,n)  # stores the starting point for each constraint to be used in the subgradient method
+    st_rule = [0, 1, 2]        # sets the stopping rule for the algorithm
+    cut_added = true       # indicates whether a cut (of any type) has been added to the model
+    con_num = length(rhs_list)          # the number of constraint
+    violation_val = Array{Float64}(con_num)     # stores the violation value for each constraint at the current optimal point
+    normalized_violation_val = Array{Float64}(con_num)     # stores the violation value after being normalized wrt the rhs
+    iter_ecp = 1                                # iteration counter
 
-    #getting the initial solution of the model
+    # set parameters to switch between solving LP and IP at iterations
+    lp_flag = true          # if the LP method is used to solve the current model
+    ip_flag = false         # if the IP method is used to solve the current model
+    lp_to_ip_iter = 0       # number of iterations to solve as LP before switching to IP
+    lp_to_ip_tol = 0.05     # relative constraint violation threshold in the LP mode before swithcing to IP
+
+    # initializing time parameters
+    clock_start = time_ns()
+    CplexSolver(CPX_PARAM_TILIM = tilim)        #sets time limit parameter for the solver
+
+    # get the initial solution of the model
     status = solve(m2)
     obj_val = getobjectivevalue(m2)
     x_val = getvalue(x)
@@ -74,52 +93,95 @@ function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list:
     #performing the ecp method until the stopping criteria is met
     while stop_rule_ecp(st_rule)
 
+        # if the previous iteration has not added any cuts to the model:
+        if cut_added == false
+            # 1. if CGLP method has not been activated: activate it
+            if CGLP_flag == false
+                CGLP_flag == true
+                subgrad_flag == false
+            # 2. if the CGLP has been solved to optimality: no cuts can be obtained from the current OA, B&B is needed to improve further
+            elseif status_CGLP == :Optimal
+                println("OA optimal solution found!")
+                status_output = :OA_Optimal
+                break
+            # 3. if the CGLP was not solved to optimality: cannot decide on the optimality of the current OA
+            else
+                println("CGLP not optimal!")
+                status_output = :CGLP_Limit
+                break
+            end
+        end
+
+
         #computing the violation value of the current point at each constraint
         for i=1:con_num
             violation_val[i] = con_list[i].single_function(x_val) + con_list[i].constant
+            normalized_violation_val[i] = violation_val[i]/max(1e-9, abs(con_list[i].constant))
         end
 
-        sort_ind = sortperm(violation_val)     #stores the indices of the ascending sorted elements of violation_val
+        sort_ind = sortperm(normalized_violation_val)     #stores the indices of the ascending sorted elements of violation_val
 
+        # if the current point satisfies all constraints, it is global optimal
         if violation_val[sort_ind[end]] <= 0
-            println("Optimal solution found!")
-            status_output = :Optimal
+            println("Global optimal solution found!")
+            status_output = :Global_Optimal
             break
         end
 
-        cut_num = 0       #number of cuts added so far
-        CGLP_cut = false    #CGLP cut has been added
-        subgrad_cut = false     #subgradient cut has been added
-        cut_added = false      #any cut has been added
+        # check whether to solve IP or LP based on the violation tolerance and the iteration number
+        if lp_flag == true
+            if (normalized_violation_val[sort_ind[end]] <= lp_to_ip_tol) || (iter_ecp > lp_to_ip_iter)
+                lp_flag == false
+                ip_flag == true
+                setcategory(x, :Int)        # makes variable type integer 
+            end
+        end
+
+        cut_num = 0       # number of cuts added so far
+        CGLP_cut = false    # CGLP cut has been added
+        subgrad_cut = false     # subgradient cut has been added
+        cut_added = false      # any cut has been added
+        status_CGLP = :Optimal # it is assumed that CGLP will solve to optimality by default
 
         for i=con_num:-1:1
 
-            if (added_cut < cut_num) || (violation_val[sort_ind[i]] <= 0)   #stop the loop if the inequality is satisfied or the number of allowable cuts is fulfilled
+            clock_end = time_ns()
+            time_elapsed = float(clock_end - clock_start)
+            c_index = sort_ind[i]
+
+            # stop the loop if the inequality is satisfied or the number of allowable cuts is fulfilled or time exceeds the limit
+            if (added_cut < cut_num) || (violation_val[c_index] <= 0) || (time_elapsed > time_limit)
                 break
             end
 
-            if cut_technique == 1       #uses subgradient method to generate cut
-                obj1, cut_coef1, cut_rhs1 = subgradient(dd_list[sort_ind[i]], x_val; sp = subgrad_start_point[sort_ind[i],:])
+            time_remain = max(0, time_limit - time_elapsed)     # compute the remaining time
 
-                if obj1 > 0             #if the inequality cuts off the point
+            if subgrad_flag == true       # uses subgradient method to generate cut
+                obj1, cut_coef1, cut_rhs1 = subgradient(dd_list[c_index], x_val, sp = subgrad_start_point[c_index,:], tilim = time_remain)
+
+                if obj1 > 0             # if the inequality cuts off the point
                     cut_num += 1
                     subgrad_cut = true
-                    aff = AffExpr(x, cut_coef1, 0)      #stores the affine expression of the inequality
+                    aff = AffExpr(x, cut_coef1, 0)      # stores the affine expression of the inequality
                     @constraint(m2, aff <= cut_rhs1)
-                    subgrad_start_point[sort_ind[i],:] = cut_coef1      #uses the current cut's normal vector as the initial point for the next subgrad iteration
+                    subgrad_start_point[c_index,:] = cut_coef1      # uses the current cut's normal vector as the initial point for the next subgrad iteration
                 end
             end
 
 
-            if cut_technique == 2       #uses CGLP to generate cut
-                obj1, cut_coef1, cut_rhs1, status1 = CGLP(dd_list[sort_ind[i]], x_val)
+            if CGLP_flag == true       # uses CGLP to generate cut
+                obj1, cut_coef1, cut_rhs1, status1 = CGLP(dd_list[c_index], x_val, tilim = time_remain)
 
                 if (status1 == :Optimal) && (obj1 > 0)
                     cut_num += 1
                     CGLP_cut = true
                     aff = AffExpr(x, cut_coef1, 0)      #stores the affine expression of the inequality
                     @constraint(m2, aff <= cut_rhs1)
+                elseif status1 != :Optimal
+                    status_CGLP == status1
+                    info("CGLP terminated, unbounded or infeasible!")
                 end
+
             end
 
         end
@@ -128,6 +190,12 @@ function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list:
 
         #getting the initial solution of the model if a cut has been added
         if cut_added
+
+            clock_end = time_ns()
+            time_elapsed = float(clock_end - clock_start)
+            time_remain = max(0, time_limit - time_elapsed)     # compute the remaining time
+            CplexSolver(CPX_PARAM_TILIM = time_remain)        #sets time limit parameter for the solver
+
             status = solve(m2)
             obj_val = getobjectivevalue(m2)
             x_val = getvalue(x)
