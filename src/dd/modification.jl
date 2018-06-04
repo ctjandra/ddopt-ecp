@@ -9,9 +9,9 @@ get_node_value(dd::DecisionDiagram, node::Int, key::Symbol) = get_prop(dd.graph,
 set_node_state!(dd::DecisionDiagram, node::Int, value::Any) = set_prop!(dd.graph, node, :state, value)
 get_node_state(dd::DecisionDiagram, node::Int) = get_prop(dd.graph, node, :state)
 set_node_layer!(dd::DecisionDiagram, node::Int, value::Int) = set_prop!(dd.graph, node, :layer, value)
-get_node_layer(dd::DecisionDiagram, node::Int) = get_prop(dd.graph, node, :layer)
+get_node_layer(dd::DecisionDiagram, node::Int)::Int = get_prop(dd.graph, node, :layer)
 set_node_idlayer!(dd::DecisionDiagram, node::Int, value::Int) = set_prop!(dd.graph, node, :idlayer, value)	#idlayer represents the position of the node in its layer
-get_node_idlayer(dd::DecisionDiagram, node::Int) = get_prop(dd.graph, node, :idlayer)
+get_node_idlayer(dd::DecisionDiagram, node::Int)::Int = get_prop(dd.graph, node, :idlayer)
 
 # Non-essential properties that are common
 set_node_obj_val!(dd::DecisionDiagram, node::Int, value::Real) = set_prop!(dd.graph, node, :obj_val, value)	#obj_val represents the longest path from source to the node
@@ -23,7 +23,7 @@ get_node_obj_label(dd::DecisionDiagram, node::Int) = get_prop(dd.graph, node, :o
 
 
 """Add a new node to the decision diagram with a given state and return the node's id"""
-function add_node!(dd::DecisionDiagram, layer::Int, state::Any)
+function add_node!(dd::DecisionDiagram, layer::Int, state::Any)::Int
 	g = dd.graph
 	add_vertex!(g)
 	id::Int = nv(g)

@@ -28,7 +28,7 @@ end
 """
 Return the variable indices involved in an expression.
 """
-function get_vars_expr(expr::Expr)
+function get_vars_expr(expr::Expr)::Set
     vars = Set()
     exprs_to_process = [expr]               #stores remaining (sub)expressions in expr that need to be preocessed
     while !isempty(exprs_to_process)
@@ -114,7 +114,7 @@ Return the sense of a given expression in form of an (in)equality.
 Returns error if the expression is not (in)equality
 """
 
-function get_constraint_sense(expr::Expr)
+function get_constraint_sense(expr::Expr)::Symbol
     if expr.head == :call && expr.args[1] in [:(<=), :(==), :(>=)]
         return expr.args[1]            #Symbol for the (in)equality sense
     else
@@ -128,7 +128,7 @@ end
 #*************************************************************************
 
 # Evaluate a univariate expression replacing the variable by the given value.
-@memoize function eval_var(expr::Expr, val::Real)
+@memoize function eval_var(expr::Expr, val::Real)::Float64
     # Replace references by the value
     if expr.head == :ref        #if the expression is composed of a single variable assigns the value
         return val
@@ -161,7 +161,7 @@ end
 """
 Calculate min and max value of a univariate expression over a given domain.
 """
-function min_max_calculator(expr::Expr, doms::Range)
+function min_max_calculator(expr::Expr, doms::Range)::Tuple{Float64, Float64}
     min_val = Inf
     max_val = -Inf
     for j in doms
@@ -173,7 +173,7 @@ function min_max_calculator(expr::Expr, doms::Range)
 end
 
 #An alternative method, where it takes a univarate function as input and computes the min and max over given domain
-function min_max_calculator(func::Function, doms::Range)
+function min_max_calculator(func::Function, doms::Range)::Tuple{Float64, Float64}
     min_val = Inf
     max_val = -Inf
     for j in doms
@@ -191,10 +191,10 @@ end
 Oracle that yields functional specifications of a constraint.
 """
 mutable struct SeparableFunctionEvaluation
-#    separate_exprs::Array{Expr}     # each element stores the univariate expression for a variable
-    single_function::Function       # evaluate the whole multivariate function in the constraint at any point (without the constant part)
+#    separate_exprs::Array{Expr}        # each element stores the univariate expression for a variable
+    single_function::Function           # evaluate the whole multivariate function in the constraint at any point (without the constant part)
     separate_functions::Array{Function} # each element stores the univariate function for a variable
-    constant::Real         # constant term of function
+    constant::Float64                   # constant term of function
 end
 
 

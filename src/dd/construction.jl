@@ -13,17 +13,17 @@ end
 DecisionDiagram(nvars::Int) = DecisionDiagram(MetaDiGraph(), [[] for i=1:nvars+1])
 
 """Return the number of node layers in the decision diagram"""
-nlayers(dd::DecisionDiagram) = size(layers)
+nlayers(dd::DecisionDiagram)::Int = size(layers)
 
 """Return the number of variables (or number of arc layers) in the decision diagram"""
-nvars(dd::DecisionDiagram) = size(layers) - 1
+nvars(dd::DecisionDiagram)::Int = size(layers) - 1
 
 
 """Problem specifications required to construct decision diagram"""
-struct ProblemSpecs
-	initial_state::Any               # Initial state at the root
+struct ProblemSpecs{S}
+	initial_state::S                 # Initial state at the root
 	transition_function::Function    # Transition function of DP formulation
-	domain_range::Array{Range}       # domain range for each variable
+	domain_range::Array{Range{Int}}  # domain range for each variable
 end
 
 
@@ -36,7 +36,7 @@ Construct a decision diagram.
 - `problem`: Problem specification (initial state, transition function, domain function) based on DP formulation of the problem.
 - `ordering`: Ordering of the variables in DD.
 """
-function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrdering())
+function construct_DD(n::Int, problem::ProblemSpecs{S}; ordering::Ordering = NoOrdering())::DecisionDiagram where S
 
 	# TODO
 	# - This is not a top-down search, but a simple depth-first one
@@ -47,7 +47,7 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 	dd = DecisionDiagram(n)
 
 	# TODO For top-down, this should probably only be a single Dict
-	layer_states = [Dict{Any, Int}() for i=1:n+1]
+	layer_states = [Dict{S, Int}() for i=1:n+1]
 
 	# Add source node
 	source = add_node!(dd, 1, problem.initial_state)	#the index of the created node
@@ -67,14 +67,14 @@ function construct_DD(n::Int, problem::ProblemSpecs; ordering::Ordering = NoOrde
 			continue # terminal node
 		end
 
-		state = get_node_state(dd, node)
+		state::S = get_node_state(dd, node)
 		var = get_var(ordering, layer)
 
 		# println("Layer $(layer): exploring $(node) with state $(state)")
 
 		# Create children
-		for val in problem.domain_range[var]
-			new_state = problem.transition_function(state, var, val)
+		for val::Int in problem.domain_range[var]
+			new_state::Union{S,Void} = problem.transition_function(state, var, val)
 
 			# Nothing to do if new state is the false node
 			if new_state == nothing
