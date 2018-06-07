@@ -13,10 +13,10 @@ end
 DecisionDiagram(nvars::Int) = DecisionDiagram(MetaDiGraph(), [[] for i=1:nvars+1])
 
 """Return the number of node layers in the decision diagram"""
-nlayers(dd::DecisionDiagram)::Int = size(layers)
+nlayers(dd::DecisionDiagram)::Int = length(dd.layers)
 
 """Return the number of variables (or number of arc layers) in the decision diagram"""
-nvars(dd::DecisionDiagram)::Int = size(layers) - 1
+nvars(dd::DecisionDiagram)::Int = length(dd.layers) - 1
 
 
 """Problem specifications required to construct decision diagram"""
@@ -81,8 +81,9 @@ function construct_DD(n::Int, problem::ProblemSpecs{S}; ordering::Ordering = NoO
 				continue
 			end
 
-			#new_state = floor(new_state)
-			new_state = floor(10*new_state)/10		# rounds down the fractional state values: ONLY use to construct RELAXED DD when state values are fractional, e.g., for the pricing problem
+			#new_state = floor(new_state/10)
+			new_state = floor(new_state)
+			#new_state = floor(10*new_state)/10		# rounds down the fractional state values: ONLY use to construct RELAXED DD when state values are fractional, e.g., for the pricing problem
 
 			next_layer = layer + 1
 			states_to_nodes = layer_states[next_layer]

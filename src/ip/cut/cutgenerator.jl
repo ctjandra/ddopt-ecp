@@ -27,27 +27,27 @@ function CGLP(dd::DecisionDiagram, fractional_point::Array{Float64}; tilim::Floa
     node_num = nv(g)
     arc_num = ne(g)
 
-    #Preparing an optimization model
+    # Preparing an optimization model
     m = Model(solver = CplexSolver(CPX_PARAM_TILIM = tilim))
 
-    #defining variables
+    # Defining variables
     @variable(m, theta_plus[vertices(g)] >= 0)
     @variable(m, theta_minus[vertices(g)] >= 0)
     @variable(m, gamma_plus[1:n] >= 0)
     @variable(m, gamma_minus[1:n] >= 0)
 
-    #fixing the theta of the source node at zero
+    # Fixing the theta of the source node at zero
     source_ind = dd.layers[1][1]            #gets the index value of the source node
     setupperbound(theta_plus[source_ind], 0)
     setupperbound(theta_minus[source_ind], 0)
 
-    #getting the index of the terminal node
+    # Getting the index of the terminal node
     terminal_ind = dd.layers[end][1]
 
-    #defining objective function
+    # Defining objective function
     @objective(m, Max, sum((gamma_plus[i] - gamma_minus[i])*fractional_point[i] for i in 1:n) - theta_plus[terminal_ind] + theta_minus[terminal_ind])
 
-    #adding projection cone constraints
+    # Adding projection cone constraints
     for e in edges(g)
         t_e = src(e)    #gets the tail of e
         h_e = dst(e)    #gets the head of e
@@ -58,14 +58,18 @@ function CGLP(dd::DecisionDiagram, fractional_point::Array{Float64}; tilim::Floa
         end
     end
 
-    #adding normalization constraints
+    # Adding normalization constraints
     @constraint(m, sum(gamma_plus[i] + gamma_minus[i] for i in 1:n) <= 1)
 
-    #solving the model
+    # Solving the model
     status = solve(m)
 
-    #getting the output
+    # Getting the output
     obj = getobjectivevalue(m)  #gets the optimal value
+
+    println("--------------")
+    println("status: ", status)
+    println("CGLP obj: ", obj)
 
     coefficients = zeros(n)   #coefficient of the CGLP inequality
     for i=1:n
@@ -132,7 +136,7 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step
     delta = 0               # the violation value (objective value)
     subgrad = ones(n)       # subgradient vector
     iter = 1                # iteration number
-    stop_criterion = [0]                # stopping criterion
+    stop_criterion = [0, 1]                # stopping criterion
     if norm(starting_point) > 0         # normalizing the starting point and making a copy
         gamma = starting_point/norm(starting_point)
     else
@@ -143,7 +147,7 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step
     iter_max = 20      # the maximum number of iterations to execute the algorithm
     tolerance = 0.05    # the tolerance for relative error
     tol_num = 2         # the number of past objective values (including the current one) wrt which the tolerance is computed
-    obj_history = zeros(tol_num)    # stores the previous (improved) objective values for tolerance check
+    obj_history = Array{Float64}(tol_num)    # stores the previous (improved) objective values for tolerance check
 
     # function to define what stopping criterion must be used:
     # 0: time
@@ -154,7 +158,7 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step
         p = true
         for v in st
             if v == 0         # compares time elapsed with given time limit
-                clock_end = time_ns()
+                clock_end = time()
                 time_elapsed = float(clock_end - clock_start)
                 p = p && time_elapsed <= tilim
             end
@@ -162,9 +166,9 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step
                 p = p && iter <= iter_max
             end
             if v == 2       # uses the concavity error criterion
-                p = p && (norm(subgrad) - delta)/(norm(subgrad) + 1e-5) > tolerance
+                p = p && (norm(subgrad) - delta)/max(norm(subgrad), 1e-9) > tolerance
             end
-            if v == 3       # uses the objective improvement criterion
+            if v == 3       # uses the objective improvement criterion (ONLY considers positive violation values)
                 if obj_history[end] != best_obj   # if the objective value is updated, the obj_history vector must be updated as well and the criterion is checked
                     push!(obj_history, best_obj)
                     deleteat!(obj_history, 1)
@@ -176,7 +180,7 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step
     end
 
     # initializing time parameter
-    clock_start = time_ns()
+    clock_start = time()
 
     # Main algorithm
     while stop_rule(stop_criterion)
@@ -187,11 +191,14 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step
         # computing the violatation value of the current inequality at the given fractional point
         delta = gamma'*fractional_point - lpv1
 
-        if delta > best_obj
+        if delta > best_obj                 # since best_obj >= 0 by construction, this means that a cut is detected
+            if best_obj <= 0                # i.e., the current inequality is the first that cuts off the fractional point
+                iter_max = iter + 1                   # reduce the number of iterations after detecting a cut
+                stop_criterion= [0, 1, 2]             # changes the stop rule to the one that considers both iteration number and concavity error
+            end
             best_obj = delta
             best_coefficients = gamma
             best_rhs = lpv1
-            stop_criterion= [0, 1, 2]          #changes the stop rule to the one that considers both iteration number and concavity error
         end
 
         # computing the subgradient at current iteation

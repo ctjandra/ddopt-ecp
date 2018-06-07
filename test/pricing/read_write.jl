@@ -120,8 +120,8 @@ function create_pricing_model(pricing_spec::PricingSpecs)::JuMP.Model
 	@variable(m, x[i=1:pricing_spec.var_num], lowerbound = pricing_spec.lb[i], upperbound = pricing_spec.ub[i])
 
 	scale = pricing_spec.ub											# variable x is divided by scale everywhere in the model
-	obj = AffExpr(x, pricing_spec.obj_c./scale, 0.0)				#the objective function is linear
-	@objective(m, Min, obj)
+	obj = AffExpr(x, pricing_spec.obj_c, 0.0)				#the objective function is linear
+	@objective(m, Max, obj)
 
 	@NLconstraint(m, pricing_constr[i=1:pricing_spec.pricing_constr_num], sum(pricing_spec.constr_c[i,j]*(x[j]/scale[j])*e^(-(x[j]/scale[j])^pricing_spec.constr_d[i,j]) for j=1:pricing_spec.var_num) <= pricing_spec.constr_rhs[i])
 
