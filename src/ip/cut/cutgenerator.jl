@@ -52,7 +52,7 @@ function CGLP(dd::DecisionDiagram, fractional_point::Array{Float64}; tilim::Floa
         t_e = src(e)    #gets the tail of e
         h_e = dst(e)    #gets the head of e
         lyr = get_arc_layer(dd, e)  #gets the layer of e
-        lbl = get_arc_label(dd, e)  #gets a vector of all possible labels for the arc (in case of parallel arcs)
+        lbl = get_arc_labels(dd, e)  #gets a vector of all possible labels for the arc (in case of parallel arcs)
         for l in lbl
             @constraint(m, theta_plus[t_e] - theta_minus[t_e] - theta_plus[h_e] + theta_minus[h_e] + (gamma_plus[lyr] - gamma_minus[lyr])*l <= 0)
         end

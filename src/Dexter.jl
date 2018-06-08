@@ -6,8 +6,8 @@ module Dexter
     include("solver.jl")
 
     include("dd/ordering.jl")
+    include("dd/core.jl")
     include("dd/construction.jl")
-    include("dd/modification.jl")
     include("dd/computation.jl")
 
     include("dd/mathprog/decomposition.jl")

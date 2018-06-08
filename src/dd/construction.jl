@@ -1,22 +1,5 @@
 include_dependency("ordering.jl")
-
-using LightGraphs, MetaGraphs
-
-
-
-"""Decision diagram structure"""
-mutable struct DecisionDiagram
-	graph::MetaDiGraph				#represents the directed graph of the DD
-    layers::Array{Array{Int}}		#stores index of nodes at each node layer
-end
-
-DecisionDiagram(nvars::Int) = DecisionDiagram(MetaDiGraph(), [[] for i=1:nvars+1])
-
-"""Return the number of node layers in the decision diagram"""
-nlayers(dd::DecisionDiagram)::Int = size(layers)
-
-"""Return the number of variables (or number of arc layers) in the decision diagram"""
-nvars(dd::DecisionDiagram)::Int = size(layers) - 1
+include_dependency("core.jl")
 
 
 """Problem specifications required to construct decision diagram"""
@@ -25,7 +8,6 @@ struct ProblemSpecs{S}
 	transition_function::Function    # Transition function of DP formulation
 	domain_range::Array{Range{Int}}  # domain range for each variable
 end
-
 
 
 """
