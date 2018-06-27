@@ -39,7 +39,7 @@ for i=1:constr_num
     println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
     # Construct decision diagram
-    dd_list[i] = Dexter.construct_DD(n, mathprog_specs, ordering=ordering)
+    dd_list[i] = Dexter.construct_DD(n, mathprog_specs, ordering=ordering, reduced_arc=true)
 
     println("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
 

@@ -20,43 +20,51 @@ Generate CGLP cuts.
 """
 function CGLP(dd::DecisionDiagram, fractional_point::Array{Float64}; tilim::Float64 = 100000)
 
-    n = size(dd.layers, 1) - 1     #the number of arc layers of dd
+    n = nvars(dd)     #the number of arc layers of dd (number of variables)
     @assert(n == length(fractional_point))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
 
-    g = dd.graph
-    node_num = nv(g)
-    arc_num = ne(g)
+    node_num = nnodes(dd)
+    arc_num = narcs(dd)
 
     # Preparing an optimization model
     m = Model(solver = CplexSolver(CPX_PARAM_TILIM = tilim))
 
     # Defining variables
-    @variable(m, theta_plus[vertices(g)] >= 0)
-    @variable(m, theta_minus[vertices(g)] >= 0)
+    @variable(m, theta_plus[1:node_num] >= 0)
+    @variable(m, theta_minus[1:node_num] >= 0)
     @variable(m, gamma_plus[1:n] >= 0)
     @variable(m, gamma_minus[1:n] >= 0)
 
     # Fixing the theta of the source node at zero
-    source_ind = dd.layers[1][1]            #gets the index value of the source node
+    source_ind = root(dd)            #gets the index value of the source node
     setupperbound(theta_plus[source_ind], 0)
     setupperbound(theta_minus[source_ind], 0)
 
     # Getting the index of the terminal node
-    terminal_ind = dd.layers[end][1]
+    terminal_ind = terminal(dd)
 
     # Defining objective function
     @objective(m, Max, sum((gamma_plus[i] - gamma_minus[i])*fractional_point[i] for i in 1:n) - theta_plus[terminal_ind] + theta_minus[terminal_ind])
 
-    # Adding projection cone constraints
-    for e in edges(g)
-        t_e = src(e)    #gets the tail of e
-        h_e = dst(e)    #gets the head of e
-        lyr = get_arc_layer(dd, e)  #gets the layer of e
-        lbl = get_arc_labels(dd, e)  #gets a vector of all possible labels for the arc (in case of parallel arcs)
-        for l in lbl
-            @constraint(m, theta_plus[t_e] - theta_minus[t_e] - theta_plus[h_e] + theta_minus[h_e] + (gamma_plus[lyr] - gamma_minus[lyr])*l <= 0)
+    # Adding projection cone constraints via accessing the inner graph information
+    #g = dd.graph
+    #for e in edges(g)
+    #    t_e = src(e)    #gets the tail of e
+    #    h_e = dst(e)    #gets the head of e
+    #    lyr = get_arc_layer(dd, e)    #gets the layer of e
+    #    lbl = get_arc_labels(dd, e)  #gets a vector of all labels for the arc (in case of parallel arcs)
+    #    for l in lbl
+    #        @constraint(m, theta_plus[t_e] - theta_minus[t_e] - theta_plus[h_e] + theta_minus[h_e] + (gamma_plus[lyr] - gamma_minus[lyr])*l <= 0)
+    #    end
+    #end
+
+    # Adding projection cone constraints without accessing the inner graph information
+    for i=2:n+1, node in dd.layers[i]
+        for (parent, label) in inneighbors(dd, node)
+            @constraint(m, theta_plus[parent] - theta_minus[parent] - theta_plus[node] + theta_minus[node] + (gamma_plus[i-1] - gamma_minus[i-1])*label <= 0)
         end
     end
+
 
     # Adding normalization constraints
     @constraint(m, sum(gamma_plus[i] + gamma_minus[i] for i in 1:n) <= 1)
@@ -99,7 +107,7 @@ Generate cuts via the subgradient method.
 """
 function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step_rule::Int64 = 0, starting_point::Array{Float64} = zeros(length(fractional_point)), tilim::Float64 = 100000)
 
-    n = size(dd.layers, 1) - 1     #the number of arc layers of dd
+    n = nvars(dd)     #the number of arc layers of dd
     @assert(n == length(fractional_point))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
 
 
@@ -193,7 +201,7 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64}; step
 
         if delta > best_obj                 # since best_obj >= 0 by construction, this means that a cut is detected
             if best_obj <= 0                # i.e., the current inequality is the first that cuts off the fractional point
-                iter_max = iter + 1                   # reduce the number of iterations after detecting a cut
+                iter_max = iter + 5                   # reduce the number of iterations after detecting a cut
                 stop_criterion= [0, 1, 2]             # changes the stop rule to the one that considers both iteration number and concavity error
             end
             best_obj = delta

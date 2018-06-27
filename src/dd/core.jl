@@ -6,8 +6,9 @@
 # Functions in this file must be careful to keep graph and layers synchronized
 
 using LightGraphs
-using ResumableFunctions
+#using ResumableFunctions
 import LightGraphs.SimpleGraphs.SimpleEdge
+import LightGraphs.inneighbors
 
 """Decision diagram structure"""
 mutable struct DecisionDiagram{S}
@@ -30,10 +31,10 @@ DecisionDiagram(nvars::Int) = DecisionDiagram(SimpleDiGraph{Int}(), [Array{Int,1
 	Array{Int,1}(0), Array{Int,1}(0), [], Dict{SimpleEdge{Int},Array{Int,1}}())
 
 """Return the number of node layers in the decision diagram"""
-nlayers(dd::DecisionDiagram) = size(dd.layers)
+nlayers(dd::DecisionDiagram) = length(dd.layers)
 
 """Return the number of variables (or number of arc layers) in the decision diagram"""
-nvars(dd::DecisionDiagram) = size(dd.layers) - 1
+nvars(dd::DecisionDiagram) = length(dd.layers) - 1
 
 nnodes(dd::DecisionDiagram) = nv(dd.graph)
 narcs(dd::DecisionDiagram) = ne(dd.graph)
@@ -57,7 +58,7 @@ function get_node_layer(dd::DecisionDiagram, node::Int)::Int
 	return dd.node_layers[node]
 end
 
-"""Get layer id of a node"""
+"""Get layer id of a node (the node position in its layer)"""
 function get_node_layerid(dd::DecisionDiagram, node::Int)::Int
 	return dd.node_layerids[node]
 end
@@ -94,9 +95,9 @@ function rem_node!(dd::DecisionDiagram, node::Int)
 	layer = dd.node_layers[node]
 	layerid = dd.node_layerids[node]
 	dd.layers[layer][layerid] = pop!(dd.layers[layer])
-	dd.layerids[dd.layers[layer][layerid]] = layerid
+	dd.node_layerids[dd.layers[layer][layerid]] = layerid
 
-	# Renumber last node to node according to LightGraphs implementation
+	# Renumber the last node of the graph to the removing node according to LightGraphs implementation
 	dd.states[node] = pop!(dd.states)
 	dd.node_layers[node] = pop!(dd.node_layers)
 	dd.node_layerids[node] = pop!(dd.node_layerids)
@@ -121,10 +122,40 @@ function add_arc!(dd::DecisionDiagram, node1::Int, node2::Int, label::Int)
 	if !has_edge(g, e)
 		add_edge!(g, e)
 		dd.arc_labels[e] = [label]
-	else
+	elseif findin(dd.arc_labels[e], label) != 0		# if the label does not already exist
 		push!(dd.arc_labels[e], label)
 	end
 end
+
+"""
+	Add a new arc to the decision diagram between two nodes.
+	If the arc is parallel, it does not add the arc if its label is not lower or upper bound among other arcs.
+"""
+function add_reduced_arc!(dd::DecisionDiagram, node1::Int, node2::Int, label::Int)
+	@assert(dd.node_layers[node1] < dd.node_layers[node2])
+	g = dd.graph
+	e = Edge(node1, node2)
+	# We use a list for labels because LightGraphs does not support parallel edges
+	if !has_edge(g, e)
+		add_edge!(g, e)
+		dd.arc_labels[e] = [label]
+	elseif length(dd.arc_labels[e]) == 1		# if there is only a single arc
+		if label > dd.arc_labels[e][1]
+			push!(dd.arc_labels[e], label)
+		elseif label < dd.arc_labels[e][1]
+			push!(dd.arc_labels[e], dd.arc_labels[e][1])
+			dd.arc_labels[e][1] = label
+		end
+	else
+		@assert(length(dd.arc_labels[e]) == 2)
+		if label > dd.arc_labels[e][2]
+			dd.arc_labels[e][2] = label
+		elseif label < dd.arc_labels[e][1]
+			dd.arc_labels[e][1] = label
+		end
+	end
+end
+
 
 # TODO rem_arc! is untested
 """Remove a labeled arc from a decision diagram"""
@@ -147,6 +178,7 @@ end
 
 """Return all arc labels between two nodes"""
 get_arc_labels(dd::DecisionDiagram, node1::Int, node2::Int) = dd.arc_labels[Edge(node1, node2)]
+get_arc_labels(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}) = dd.arc_labels[arc]
 
 # if the head node has layer k, the arc layer is k-1 (account for long arcs too)
 get_arc_layer(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64})::Int = dd.node_layers[dst(arc)] - 1

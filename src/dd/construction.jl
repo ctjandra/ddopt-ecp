@@ -17,8 +17,9 @@ Construct a decision diagram.
 - `n`: Number of variables (arc layers).
 - `problem`: Problem specification (initial state, transition function, domain function) based on DP formulation of the problem.
 - `ordering`: Ordering of the variables in DD.
+- `reduced_arc`: Determines whether parallel arcs are merged to their lower and upper bound label values
 """
-function construct_DD(n::Int, problem::ProblemSpecs{S}; ordering::Ordering = NoOrdering())::DecisionDiagram where S
+function construct_DD(n::Int, problem::ProblemSpecs{S}; ordering::Ordering = NoOrdering(), reduced_arc::Bool = false)::DecisionDiagram where S
 
 	# TODO
 	# - This is not a top-down search, but a simple depth-first one
@@ -82,7 +83,11 @@ function construct_DD(n::Int, problem::ProblemSpecs{S}; ordering::Ordering = NoO
 				push!(unexplored_nodes, t)
 			end
 
-			add_arc!(dd, node, t, val)
+			if reduced_arc
+				add_reduced_arc!(dd, node, t, val)
+			else
+				add_arc!(dd, node, t, val)
+			end
 			# println("Added $val-arc from $node to $t")
 		end
 	end

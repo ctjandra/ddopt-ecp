@@ -42,11 +42,11 @@ function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list:
                 clock_end = time()
                 time_elapsed = float(clock_end - clock_start)
                 p = p && time_elapsed <= time_limit
-                println("v==0: ", p)
+                #println("v==0: ", p)
             end
             if v == 1       # the number of iteration criterion
                 p = p && iter_ecp <= iter_max_ecp
-                println("v==1: ", p)
+                #println("v==1: ", p)
             end
             if v == 2       # uses the objective improvement criterion
                 if cut_added   # if a cut has been added to the model, the `obj_history_ecp` vector must be updated and the criterion is checked
@@ -98,11 +98,12 @@ function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list:
 
     #************************************************************
     #performing the ecp method until the stopping criteria is met
-    println("@@@@@@@@@@@@@@@@@@@@", stop_rule_ecp(st_rule))
+
+    #println("@@@@@@@@@@@@@@@@@@@@", stop_rule_ecp(st_rule))
 
     while stop_rule_ecp(st_rule)
 
-        println("@@@@@@@@@@@@@@@@@@@@")
+        #println("@@@@@@@@@@@@@@@@@@@@")
 
         # if the previous iteration has not added any cuts to the model:
         if cut_added == false && iter_ecp > 1
@@ -179,6 +180,8 @@ function ECP(n::Int64, m::JuMP.Model, dd_list::Array{DecisionDiagram}, con_list:
 
             if subgrad_flag == true       # uses subgradient method to generate cut
                 obj1, cut_coef1, cut_rhs1 = subgradient(dd_list[c_index], x_val, step_rule = 0, starting_point = subgrad_start_point[c_index,:], tilim = time_remain)
+
+                #println("\nsubgrad alg used\n")
 
                 if obj1 > 0             # if the inequality cuts off the point
                     cut_num += 1
