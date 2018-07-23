@@ -29,7 +29,7 @@ domains = Dexter.create_constraint_domain_function(m)
 ordering = Dexter.NoOrdering()
 
 # Create specs for decision diagram
-for i=1:constr_num
+for i::Int=1:constr_num
 
     eval = evals[i]
     initial_state = Dexter.create_constraint_initial_state(eval)
@@ -39,7 +39,7 @@ for i=1:constr_num
     println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
     # Construct decision diagram
-    dd_list[i] = Dexter.construct_DD(n, mathprog_specs, ordering=ordering, reduced_arc=true)
+    dd_list[i] = Dexter.construct_DD(n, mathprog_specs, ordering=ordering, reduced_arc=false)
 
     println("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
 
@@ -59,7 +59,7 @@ for i=1:constr_num
 end
 
 # Initializing parameters
-time_lim = 100
+time_lim = 100.0
 
 
 # Build the initial model

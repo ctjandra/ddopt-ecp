@@ -13,17 +13,17 @@ get_var(ordering::Ordering, layer::Int) = _NI
 struct NoOrdering <: Ordering
 end
 
-function get_var(ordering::NoOrdering, layer::Int)
+function get_var(ordering::NoOrdering, layer::Int)::Int
     return layer
 end
 
 
 # Fixed ordering
 struct FixedOrdering <: Ordering
-    fixed_ordering::Array{Int}
+    fixed_ordering::Array{Int, 1}
 end
 
-function FixedOrdering(fixed_ordering::Array{Int})
+function FixedOrdering(fixed_ordering::Array{Int, 1})::FixedOrdering
     # Check if the ordering is a valid permutation
     if !isperm(fixed_ordering)
         error("Invalid fixed ordering")

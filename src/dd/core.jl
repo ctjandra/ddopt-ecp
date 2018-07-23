@@ -1,206 +1,280 @@
 # Core structure and functions for decision diagrams
+# This structure stores both node and arc layers in arrays as fields of DD
+# It is fast to compute longest path, but (possibly?!) slow in removing nodes and arcs!
+# Commented out sections are not adjusted...
 
 # All higher level functions should use these functions instead of accessing
 # the internal structure of a decision diagram directly
 
 # Functions in this file must be careful to keep graph and layers synchronized
 
+
 using LightGraphs
 #using ResumableFunctions
-import LightGraphs.SimpleGraphs.SimpleEdge
+#import LightGraphs.SimpleGraphs.SimpleEdge
 import LightGraphs.inneighbors
 
-"""Decision diagram structure"""
-mutable struct DecisionDiagram{S}
-	graph::SimpleDiGraph{Int}            # represents the directed graph of the DD
-    layers::Array{Array{Int,1},1}        # stores index of nodes at each node layer
 
-	# Implementation ensures that node_layers, node_layerids, states always have size nv(graph)
-
-	# Node properties
-	node_layers::Array{Int,1}            # layer of node (i in layers[node_layers[i]])
-	node_layerids::Array{Int,1}          # layer id of node (i == layers[node_layers[i]][node_layerids[i]])
-	states::Array{S,1}                   # node states
-
-	# Arc properties
-	arc_labels::Dict{SimpleEdge{Int},Array{Int,1}}  # labels of arcs (due to no parallel arcs in LightGraphs, store list of labels)
+"""Node structure"""
+mutable struct Node{S<:AbstractFloat}
+	layer::Int				# node layer
+	state::S				# node state
+	out_neighbor::Array{Int,1}		# outgoing arcs of the node, stores arc id in the arc layer
+	in_neighbor::Array{Int,1}		# outgoing arcs of the node, stores arc id in the arc layer
+	aux_val::Float64		# auxiliary value at the node e.g., the longest path value
 end
 
 
-DecisionDiagram(nvars::Int) = DecisionDiagram(SimpleDiGraph{Int}(), [Array{Int,1}(0) for i=1:nvars+1],
-	Array{Int,1}(0), Array{Int,1}(0), [], Dict{SimpleEdge{Int},Array{Int,1}}())
+"""Decision diagram structure"""
+struct DecisionDiagram{S<:AbstractFloat}
+	graph::SimpleDiGraph{Int}            # represents the directed graph of the DD
+    node_layers::Array{Array{Node{S},1},1}        # stores instances of the Node class in each node layer
+	arc_layers::Array{Array{Tuple{Int, Int, Int},1},1}		# stores arc info as tuples (tail, head, label) in arc layers
+end
 
-"""Return the number of node layers in the decision diagram"""
-nlayers(dd::DecisionDiagram) = length(dd.layers)
+
+"""
+A constrcter for type `DecisionDiagram`
+
+# Input
+- `t::Type`: Data type of the state values of nodes
+- `nvars::Int`: Number of variables (arc layers)
+"""
+
+DecisionDiagram(nvars::Int; t::DataType = Float64)::DecisionDiagram{t} = DecisionDiagram{t}(SimpleDiGraph{Int}(), [Array{Node{t},1}(0) for i=1:nvars+1], [Array{Tuple{Int, Int, Int},1}(0) for i=1:nvars])
+
+
+
+
+
 
 """Return the number of variables (or number of arc layers) in the decision diagram"""
-nvars(dd::DecisionDiagram) = length(dd.layers) - 1
+nvars(dd::DecisionDiagram)::Int = length(dd.node_layers) - 1
 
-nnodes(dd::DecisionDiagram) = nv(dd.graph)
-narcs(dd::DecisionDiagram) = ne(dd.graph)
+#nnodes(dd::DecisionDiagram) = nv(dd.graph)
+nnodes(dd::DecisionDiagram)::Int = sum(length(dd.node_layers[i]) for i = 1:length(dd.node_layers))
 
-root(dd::DecisionDiagram) = dd.layers[1][1]
-terminal(dd::DecisionDiagram) = dd.layers[end][1]
+#narcs(dd::DecisionDiagram) = ne(dd.graph)
+narcs(dd::DecisionDiagram)::Int = sum(length(dd.arc_layers[i]) for i = 1:length(dd.arc_layers))
 
 
 """Set state of an existing node"""
-function set_node_state!(dd::DecisionDiagram, node::Int, state::S) where S
-	dd.states[node] = state
+function set_node_state!(dd::DecisionDiagram, layer::Int, id::Int, state::S) where S<:AbstractFloat
+	dd.node_layers[layer][id].state = state
 end
 
 """Get state of a node"""
-function get_node_state(dd::DecisionDiagram, node::Int)
-	return dd.states[node]
-end
+get_node_state(dd::DecisionDiagram, layer::Int, id::Int)::S where S<:AbstractFloat = dd.node_layers[layer][id].state
 
-"""Get layer of a node"""
-function get_node_layer(dd::DecisionDiagram, node::Int)::Int
-	return dd.node_layers[node]
-end
 
-"""Get layer id of a node (the node position in its layer)"""
-function get_node_layerid(dd::DecisionDiagram, node::Int)::Int
-	return dd.node_layerids[node]
-end
+"""Return arc label"""
+get_arc_label(dd::DecisionDiagram, layer::Int, id::Int)::Int = dd.arc_layers[layer][id][3]
+#get_arc_labels(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}) = collect(dd.nodes[src(e)].out_neighbor[dst(e)])
 
-"""Add a new node to the decision diagram with a given state and return the node's id"""
-function add_node!(dd::DecisionDiagram, layer::Int, state::S) where S
-	g = dd.graph
-	add_vertex!(g)
-	id::Int = nv(g)
-	push!(dd.layers[layer], id)
-	push!(dd.states, state)
-	push!(dd.node_layers, layer)
-	push!(dd.node_layerids, length(dd.layers[layer]))
-	@assert(length(dd.states) == id)
-	@assert(length(dd.node_layers) == id)
-	@assert(length(dd.node_layerids) == id)
+
+"""Return arc tail and head"""
+get_arc_tail(dd::DecisionDiagram, layer::Int, id::Int)::Int = dd.arc_layers[layer][id][1]
+get_arc_head(dd::DecisionDiagram, layer::Int, id::Int)::Int = dd.arc_layers[layer][id][2]
+
+get_node_layer_size(dd::DecisionDiagram, layer::Int)::Int = length(dd.node_layers[layer])
+get_arc_layer_size(dd::DecisionDiagram, layer::Int)::Int = length(dd.arc_layers[layer])
+
+#=
+function get_arc_labels(dd::DecisionDiagram, node1::Int, node2::Int)
+	i = findfirst(dd.nodes[node1].out_neighbor_nodes, node2)
+	#if i == 0
+	#	error("No arc exists between node ", node1, " and node ", node2)
+	#else
+		return dd.nodes[node1].out_neighbor_nodes[i]
+	#end
+end
+=#
+
+
+"""Return the array of incoming arcs of a node"""
+inneighbors(dd::DecisionDiagram, layer::Int, id::Int)::Array{Int, 1} = dd.node_layers[layer][id].in_neighbor
+
+"""Return the array of outgoing nodes of a node"""
+outneighbors(dd::DecisionDiagram, layer::Int, id::Int)::Array{Int, 1} = dd.node_layers[layer][id].out_neighbor
+
+
+
+
+
+
+"""Add a new node to the decision diagram with a given state and return the node's id at its layer"""
+function add_node!(dd::DecisionDiagram, layer::Int, state::S)::Int where S<:AbstractFloat
+	#g = dd.graph
+	#add_vertex!(g)
+	#aux_node = Node(layer, length(dd.layers[layer]), state, 0.0, Dict{Int, Set{Number}}(), Dict{Int, Set{Number}}())
+	aux_node::Node{S} = Node(layer, state, Array{Int, 1}(0), Array{Int,1}(0), 0.0)
+	push!(dd.node_layers[layer], aux_node)
+	id::Int = length(dd.node_layers[layer])
 	return id
 end
 
+
+
+
+#=
 # TODO: rem_node! is untested
 """Remove a node from the decision diagram"""
 function rem_node!(dd::DecisionDiagram, node::Int)
-	v in vertices(g) || return false
 
-	# Remove arc labels
-	for outnode in outneighbors(dd.graph, node)
-		delete!(dd.arc_labels, Edge(node, outnode))
+	# ensure the node belongs to the vertex set
+	# node in vertices(g) || return false
+	node <= length(dd.nodes) || return false
+
+
+	# Remove incoming and outgoing arcs of the node
+	for outnode in keys(dd.nodes[node].out_neighbor)
+		delete!(dd.nodes[outnode].in_neighbor, node)
 	end
-	for innode in inneighbors(dd.graph, node)
-		delete!(dd.arc_labels, Edge(innode, node))
+	for innode in keys(dd.nodes[node].in_neighbor)
+		delete!(dd.nodes[innode].out_neighbor, node)
 	end
 
 	# Move end node in the layer to node's position within the layer
-	layer = dd.node_layers[node]
-	layerid = dd.node_layerids[node]
+	layer = dd.nodes[node].layer
+	layerid = dd.nodes[node].layerid
 	dd.layers[layer][layerid] = pop!(dd.layers[layer])
-	dd.node_layerids[dd.layers[layer][layerid]] = layerid
+	dd.nodes[dd.layers[layer][layerid]].layerid = layerid
 
 	# Renumber the last node of the graph to the removing node according to LightGraphs implementation
-	dd.states[node] = pop!(dd.states)
-	dd.node_layers[node] = pop!(dd.node_layers)
-	dd.node_layerids[node] = pop!(dd.node_layerids)
-	dd.layers[dd.node_layers[node]][dd.node_layerids[node]] = node
+	lastid = length(dd.nodes)
+	dd.nodes[node] = pop!(dd.nodes)			# swap the last node with the removed node
+	dd.layers[dd.nodes[node].layer][dd.nodes[node].layerid] = node			# update the last node number in dd.layers
+	# Update the head/tail number in the incoming/outgoing arcs of the last node
+	for outnode in keys(dd.nodes[node].out_neighbor)
+		dd.nodes[outnode].in_neighbor[node] = dd.nodes[outnode].in_neighbor[lastid]
+		delete!(dd.nodes[outnode].in_neighbor, lastid)
+	end
+	for innode in keys(dd.nodes[node].in_neighbor)
+		dd.nodes[innode].out_neighbor[node] = dd.nodes[innode].out_neighbor[lastid]
+		delete!(dd.nodes[innode].out_neighbor, lastid)
+	end
+
 
 	# Remove vertex from graph structure
-	removed = rem_vertex!(dd.graph, node)
-	@assert(removed)
+	#removed = rem_vertex!(dd.graph, node)
+	#@assert(removed)
 end
+=#
 
+
+#=
 """Remove a node from the decision diagram given its layer and layerid"""
 function rem_node!(dd::DecisionDiagram, layer::Int, layerid::Int)
 	rem_node!(dd, dd.layers[layer][layerid])
 end
+=#
 
+
+
+#=
 """Add a new arc to the decision diagram between two nodes"""
 function add_arc!(dd::DecisionDiagram, node1::Int, node2::Int, label::Int)
-	@assert(dd.node_layers[node1] < dd.node_layers[node2])
-	g = dd.graph
-	e = Edge(node1, node2)
-	# We use a list for labels because LightGraphs does not support parallel edges
-	if !has_edge(g, e)
-		add_edge!(g, e)
-		dd.arc_labels[e] = [label]
-	elseif findin(dd.arc_labels[e], label) != 0		# if the label does not already exist
-		push!(dd.arc_labels[e], label)
+	@assert((dd.nodes[node1].layer < dd.nodes[node2].layer) && (node1 <= length(dd.nodes)) && (node2 <= length(dd.nodes)))
+	#g = dd.graph
+	#e = Edge(node1, node2)
+
+	# check if an arc between two nodes already exists
+	i = findfirst(dd.nodes[node1].out_neighbor_nodes, node2)
+	if i==0
+		#add_edge!(g, e)
+		push!(dd.nodes[node1].out_neighbor_nodes, node2)
+		push!(dd.nodes[node1].out_neighbor_arcs, [label])
+		push!(dd.nodes[node2].in_neighbor_nodes, node1)
+		push!(dd.nodes[node2].in_neighbor_arcs, [label])
+	else
+		j = findfirst(dd.nodes[node2].in_neighbor_nodes, node1)
+		push!(dd.nodes[node1].out_neighbor_arcs[i], label)
+		push!(dd.nodes[node2].in_neighbor_arcs[j], label)
 	end
 end
+=#
 
+"""Add a new arc to the decision diagram between two nodes and retunrs arc id in its layer"""
+function add_arc!(dd::DecisionDiagram, layer1::Int, node1_id::Int, layer2::Int, node2_id::Int, label::Int)
+	#@assert((dd.nodes[node1].layer < dd.nodes[node2].layer) && (node1 <= length(dd.nodes)) && (node2 <= length(dd.nodes)))
+	#g = dd.graph
+	#e = Edge(node1, node2)
+	@assert(layer1 == layer2 - 1)
+	push!(dd.arc_layers[layer1], (node1_id, node2_id, label))
+	id::Int = length(dd.arc_layers[layer1])
+	push!(dd.node_layers[layer1][node1_id].out_neighbor, id)
+	push!(dd.node_layers[layer2][node2_id].in_neighbor, id)
+end
+
+
+#=
 """
-	Add a new arc to the decision diagram between two nodes.
+	Add a new arc to the decision diagram between two nodes, where the arc_merging is on.
 	If the arc is parallel, it does not add the arc if its label is not lower or upper bound among other arcs.
 """
 function add_reduced_arc!(dd::DecisionDiagram, node1::Int, node2::Int, label::Int)
-	@assert(dd.node_layers[node1] < dd.node_layers[node2])
-	g = dd.graph
-	e = Edge(node1, node2)
+	@assert((dd.nodes[node1].layer < dd.nodes[node2].layer) && (node1 <= length(dd.nodes)) && (node2 <= length(dd.nodes)))
+	#g = dd.graph
+	#e = Edge(node1, node2)
+
 	# We use a list for labels because LightGraphs does not support parallel edges
-	if !has_edge(g, e)
-		add_edge!(g, e)
-		dd.arc_labels[e] = [label]
-	elseif length(dd.arc_labels[e]) == 1		# if there is only a single arc
-		if label > dd.arc_labels[e][1]
-			push!(dd.arc_labels[e], label)
-		elseif label < dd.arc_labels[e][1]
-			push!(dd.arc_labels[e], dd.arc_labels[e][1])
-			dd.arc_labels[e][1] = label
-		end
+	# check if an arc between two nodes already exists
+	if !haskey(dd.nodes[node1].out_neighbor, node2)
+		#add_edge!(g, e)
+		dd.nodes[node1].out_neighbor[node2] = Set([label])
+		dd.nodes[node2].in_neighbor[node1] = Set([label])
+	elseif length(dd.nodes[node1].out_neighbor[node2]) == 1		# if there is only a single arc
+		push!(dd.nodes[node1].out_neighbor[node2], label)	# adds the new label to the parallel arcs
+		push!(dd.nodes[node2].in_neighbor[node1], label)
 	else
-		@assert(length(dd.arc_labels[e]) == 2)
-		if label > dd.arc_labels[e][2]
-			dd.arc_labels[e][2] = label
-		elseif label < dd.arc_labels[e][1]
-			dd.arc_labels[e][1] = label
+		@assert(length(dd.nodes[node1].out_neighbor[node2]) == 2)
+		temp = collect(dd.nodes[node1].out_neighbor[node2])			# creates an array of elements of the set
+		if label > max(temp[1],temp[2])
+			push!(dd.nodes[node1].out_neighbor[node2], label)	# adds the new label to the parallel arcs
+			setdiff!(dd.nodes[node1].out_neighbor[node2], max(temp[1],temp[2]))
+			push!(dd.nodes[node2].in_neighbor[node1], label)	# adds the new label to the parallel arcs
+			setdiff!(dd.nodes[node2].in_neighbor[node1], max(temp[1],temp[2]))
+		elseif label < min(temp[1],temp[2])
+			push!(dd.nodes[node1].out_neighbor[node2], label)	# adds the new label to the parallel arcs
+			setdiff!(dd.nodes[node1].out_neighbor[node2], min(temp[1],temp[2]))
+			push!(dd.nodes[node2].in_neighbor[node1], label)	# adds the new label to the parallel arcs
+			setdiff!(dd.nodes[node2].in_neighbor[node1], min(temp[1],temp[2]))
 		end
 	end
 end
+=#
 
 
+
+
+#=
 # TODO rem_arc! is untested
 """Remove a labeled arc from a decision diagram"""
 function rem_arc!(dd::DecisionDiagram, node1::Int, node2::Int, label::Int)
-	e = Edge(node1, node2)
-	deleteat!(dd.arc_labels[e], findfirst(dd.arc_labels[e] .== label))
-	if isempty(dd.arc_labels[e])
-		rem_edge!(dd.graph, e)
-		delete!(dd.arc_labels, e)
+	# checks if the arc exists
+	if haskey(dd.nodes[node1].out_neighbor, node2)
+		setdiff!(dd.nodes[node1].out_neighbor[node2], label)
+		setdiff!(dd.nodes[node2].in_neighbor[node1], label)
+		if isempty(dd.nodes[node1].out_neighbor[node2])
+			#e = Edge(node1, node2)
+			#rem_edge!(dd.graph, e)
+			delete!(dd.nodes[node1].out_neighbor, node2)
+			delete!(dd.nodes[node2].in_neighbor, node1)
+		end
 	end
 end
+=#
 
+#=
 # TODO rem_arcs! is untested
 """Remove all (parallel) arcs between two nodes from a decision diagram"""
 function rem_arcs!(dd::DecisionDiagram, node1::Int, node2::Int)
-	e = Edge(node1, node2)
-	rem_edge!(dd.graph, e)
-	delete!(dd.arc_labels, e)
-end
-
-"""Return all arc labels between two nodes"""
-get_arc_labels(dd::DecisionDiagram, node1::Int, node2::Int) = dd.arc_labels[Edge(node1, node2)]
-get_arc_labels(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}) = dd.arc_labels[arc]
-
-# if the head node has layer k, the arc layer is k-1 (account for long arcs too)
-get_arc_layer(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64})::Int = dd.node_layers[dst(arc)] - 1
-
-"""Return the in neighbors of a node"""
-function inneighbors(dd::DecisionDiagram, node::Int)
-	result = []
-	for v in inneighbors(dd.graph, node)
-		for label in dd.arc_labels[Edge(v, node)]
-			push!(result, (v, label))
-		end
+	# checks if the arc exists
+	if haskey(dd.nodes[node1].out_neighbor, node2)
+		#e = Edge(node1, node2)
+		#rem_edge!(dd.graph, e)
+		delete!(dd.nodes[node1].out_neighbor, node2)
+		delete!(dd.nodes[node2].in_neighbor, node1)
 	end
-	return result
 end
-
-"""Return the out neighbors of a node"""
-function outneighbors(dd::DecisionDiagram, node::Int)
-	result = []
-	for v in outneighbors(dd.graph, node)
-		for label in dd.arc_labels[Edge(node, v)]
-			push!(result, (v, label))
-		end
-	end
-	return result
-end
+=#

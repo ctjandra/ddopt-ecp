@@ -202,7 +202,7 @@ end
 Return decomposition terms of constraints of a model.
 
 # Output
-- `evals`: An array of instances that store function specification for constraints
+- `evals`: An array of instances that stores function specification for constraints
 """
 function evaluate_separable_constraints(m::Model)::Array{SeparableFunctionEvaluation}
     d = JuMP.NLPEvaluator(m)        #obtains an NLP evaluator object from a JuMP model, which enables query of function characteristics in the model

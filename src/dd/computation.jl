@@ -1,5 +1,7 @@
 include_dependency("core.jl")
 
+#=
+# NOTE: This function needs to be adjusted.
 """
 Find a longest path on DD.
 
@@ -29,7 +31,7 @@ function longest_path(dd::DecisionDiagram, func::Array{Function})
         temp_v = -Inf
         temp_p = 0
         temp_l = 0
-        for (parent, label) in inneighbors(dd, node)
+        for parent in inneighbors(dd, node), label in get_arc_labels(dd, parent, node)
             val = node_obj_vals[parent] + func[i-1](label)    #computes the head node value based on the tail and arc label
             if val > temp_v
                 temp_v = val
@@ -57,7 +59,7 @@ function longest_path(dd::DecisionDiagram, func::Array{Function})
 
     return reverse(lp), lpv
 end
-
+=#
 
 
 """
@@ -75,43 +77,41 @@ function longest_path(dd::DecisionDiagram, cf::Array{T} where T<:Float64)
     return longest_path(dd, func)
 end
 """
+#This version is for DD structure where we store arc layers, and use them directly to compute the longest path
+function longest_path(dd::DecisionDiagram, cf::Array{Float64})::Tuple{Array{Int, 1}, Float64}
 
-
-function longest_path(dd::DecisionDiagram, cf::Array{T} where T<:Float64)
-
-    n = nvars(dd)
+    n::Int = nvars(dd)
     @assert(n == length(cf))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
 
-    node_num = nnodes(dd)
-    node_obj_vals = Array{Float64}(node_num)   #stores the maximum objective value computed from the source to each node
+
+    aux_val::Array{Array{Float64,1}, 1} = [Array{Float64,1}(0) for i=1:n+1]
 
     #setting the root objective value equal to zero
-    node_obj_vals[root(dd)] = 0
+    push!(aux_val[1], 0)
 
     #computing the longest path from source to a node, by searching through all nodes and their incoming arcs, layer by layer
-    for i=2:n+1, node in dd.layers[i]
-        node_obj_vals[node] = -Inf
-        for (parent, label) in inneighbors(dd, node)
-            val = node_obj_vals[parent] + cf[i-1]*label    #computes the head node value based on the tail and arc label
-            if val > node_obj_vals[node]
-                node_obj_vals[node] = val
+    for i::Int=1:n
+        aux_val[i+1] = fill(-Inf, get_node_layer_size(dd, i+1))
+        for j::Int=1:get_arc_layer_size(dd, i)
+            val::Float64 = aux_val[i][get_arc_tail(dd, i, j)] + cf[i]*get_arc_label(dd, i, j)    #computes the head node value based on the tail and arc label
+            if val > aux_val[i+1][get_arc_head(dd, i, j)]
+                aux_val[i+1][get_arc_head(dd, i, j)] = val
             end
         end
     end
 
     # Computing the max obj for the terminal node
-    terminal_node = terminal(dd)
-    lpv = node_obj_vals[terminal_node]   #the length of the longest path
+    lpv::Float64 = aux_val[n+1][1]   #the length of the longest path
 
-    lp = Array{Int}(0)
-    p = terminal_node
+    lp::Array{Int, 1} = Array{Int, 1}(0)
+    p::Int = 1                   #terminal node id at the last layer
     # Computing the arc labels on the longest path through a backtracking
-    for i=n:-1:1
-        for (parent, label) in inneighbors(dd, p)
-            val = node_obj_vals[parent] + cf[i]*label    #computes the head node value based on the tail and arc label
-            if val == node_obj_vals[p]
-                push!(lp, label)
-                p = parent
+    for i::Int=n+1:-1:2
+        for in_arc::Int in inneighbors(dd, i, p)
+            val::Float64 = aux_val[i-1][get_arc_tail(dd, i-1, in_arc)] + cf[i-1]*get_arc_label(dd, i-1, in_arc)    #computes the head node value based on the tail and arc label
+            if val == aux_val[i][p]
+                push!(lp, get_arc_label(dd, i-1, in_arc))
+                p = get_arc_tail(dd, i-1, in_arc)
                 break
             end
         end
