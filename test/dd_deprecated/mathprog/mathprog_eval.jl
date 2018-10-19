@@ -217,7 +217,7 @@ function evaluate_separable_constraints(m::Model)::Array{SeparableFunctionEvalua
     # Gather parts for separable constraints
     nconstrs = MathProgBase.numconstr(m)
     nvars = MathProgBase.numvar(m)
-    evals = Array{SeparableFunctionEvaluation}(nconstrs)
+    evals = Array{SeparableFunctionEvaluation}(undef, nconstrs)
 
     for i in 1:nconstrs
         expr = MathProgBase.constr_expr(d, i)       #gets the expression of the ith constraint
@@ -240,7 +240,7 @@ function evaluate_separable_constraints(m::Model)::Array{SeparableFunctionEvalua
         end
 
         # Organize parts per variables
-        var_parts = Array{Expr}(nvars)
+        var_parts = Array{Expr}(undef, nvars)
         for p in parts
             v = first(get_vars_expr(p))
             if !isassigned(var_parts, v)
@@ -251,7 +251,7 @@ function evaluate_separable_constraints(m::Model)::Array{SeparableFunctionEvalua
         end
 
         # Create function corresponding to each univariate expression
-        function_parts = Array{Function}(nvars)
+        function_parts = Array{Function}(undef, nvars)
         for j in 1:nvars
             if isassigned(var_parts, j)
                 function_parts[j] = (xx::Int64) -> eval_var(var_parts[j], xx)
@@ -261,9 +261,9 @@ function evaluate_separable_constraints(m::Model)::Array{SeparableFunctionEvalua
         #Computes the attributes corresponding to function value over variable domain
         #Assumes the domain consists of all integer values within the bounds of the variable
         """
-        constr_evals = Array{Dict}(nvars)
-        min_evals = Array{Real}(nvars)
-        max_evals = Array{Real}(nvars)
+        constr_evals = Array{Dict}(undef, nvars)
+        min_evals = Array{Real}(undef, nvars)
+        max_evals = Array{Real}(undef, nvars)
         for v in 1:nvars
             var = Variable(m, v)
             lb = ceil(Int, getlowerbound(var))

@@ -1,0 +1,8 @@
+1. Each univariate function is of the type x*exp(-x^i) for integer i. So, from 0 to the maximal point, it is increasing, and after that decreasing.
+This information is given as input to the Dexter code.
+
+2. For node relaxation, we round down the state values to its floor.
+
+3. For continuous case, we use 30 grids for arc relaxation.
+
+4. For subgradient, we use 20 iterations. After finding violation, we continue the algorithm for extra 20 iterations.

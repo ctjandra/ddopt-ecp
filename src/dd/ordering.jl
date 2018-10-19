@@ -31,6 +31,6 @@ function FixedOrdering(fixed_ordering::Array{Int, 1})::FixedOrdering
     return new(fixed_ordering)
 end
 
-function get_var(ordering::FixedOrdering, layer::Int)
+function get_var(ordering::FixedOrdering, layer::Int)::Array{Int, 1}
     return ordering.fixed_ordering[layer]
 end

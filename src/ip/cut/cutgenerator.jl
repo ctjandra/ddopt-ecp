@@ -26,7 +26,7 @@ function CGLP(dd::DecisionDiagram, fractional_point::Array{Float64, 1}; tilim::F
     node_num::Int = nnodes(dd)
     arc_num::Int = narcs(dd)
 
-    C_layersize::Array{Int, 1} = Array{Int, 1}(0)     # compute the cumulative number of nodes in previous layers of the indexed layer
+    C_layersize::Array{Int, 1} = Array{Int, 1}(  0)     # compute the cumulative number of nodes in previous layers of the indexed layer
     push!(C_layersize, 0)
     for i::Int = 2::n+1
         push!(C_layersize, C_layersize[i-1] + get_node_layer_size(dd, i-1))
@@ -146,7 +146,7 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64, 1}; s
     iter_max::Int = 20      # the maximum number of iterations to execute the algorithm
     tolerance::Float64 = 0.0005    # the tolerance for relative error
     tol_num::Int = 2         # the number of previous objective values (including the current one) wrt which the tolerance is computed
-    obj_history::Array{Float64, 1} = Array{Float64, 1}(tol_num)    # stores the previous (improved) objective values for tolerance check
+    obj_history::Array{Float64, 1} = Array{Float64, 1}(  tol_num)    # stores the previous (improved) objective values for tolerance check
 
     # function to define what stopping criterion must be used:
     # 0: time
@@ -170,7 +170,7 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64, 1}; s
             if v == 3       # uses the objective improvement criterion (ONLY considers positive violation values)
                 if obj_history[end] != best_obj   # if the objective value is updated, the obj_history vector must be updated as well and the criterion is checked
                     push!(obj_history, best_obj)
-                    deleteat!(obj_history, 1)
+                    popfirst!(obj_history)
                     p = p && ((best_obj - obj_history[1])/best_obj > tolerance)
                 end
             end
@@ -185,14 +185,14 @@ function subgradient(dd::DecisionDiagram, fractional_point::Array{Float64, 1}; s
     while stop_rule(stop_criterion)
 
         # computing the longest path with the objective function defined by the current direction
-        lp1::Array{Float64, 1}, lpv1::Float64 = @time longest_path(dd, gamma)
+        lp1::Array{Float64, 1}, lpv1::Float64 = longest_path(dd, gamma)
 
         # computing the violatation value of the current inequality at the given fractional point
         delta = gamma'*fractional_point - lpv1
 
         if delta > best_obj                 # since best_obj >= 0 by construction, this means that a cut is detected
             if best_obj <= 0                # i.e., the current inequality is the first that cuts off the fractional point
-                iter_max = iter + 10                   # reduce the number of iterations after detecting a cut
+                iter_max = iter + 20                   # reduce the number of iterations after detecting a cut
                 stop_criterion = [0, 1]             # changes the stop rule to the one that considers both iteration number and concavity error
             end
             best_obj = delta

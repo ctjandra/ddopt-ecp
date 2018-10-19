@@ -1,7 +1,5 @@
 include("pricing_specs.jl")
 
-using JuMP
-using Clp
 
 """
 Read a text file containing pricing problem data. Assumes file is correctly formatted.
@@ -32,7 +30,7 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	line = readline(f)
 	pieces = split(line)					#split strings into pieces separated by space (default delimiter)
 	@assert(length(pieces) == var_num)
-	lb::Array{Int, 1} = Array{Int, 1}(var_num)
+	lb::Array{Int, 1} = Array{Int, 1}(  var_num)
 	for i::Int=1:var_num
 		lb[i] = parse(Int, pieces[i])		#lower bound vector
 	end
@@ -41,7 +39,7 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	line = readline(f)
 	pieces = split(line)
 	@assert(length(pieces) == var_num)
-	ub::Array{Int, 1} = Array{Int}(var_num)
+	ub::Array{Int, 1} = Array{Int}(  var_num)
 	for i::Int=1:var_num
 		ub[i] = parse(Int, pieces[i])		#upper bound vector
 		#ub[i] = 2
@@ -51,7 +49,7 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	line = readline(f)
 	pieces = split(line)
 	@assert(length(pieces) == var_num)
-	obj_c::Array{Float64, 1} = Array{Float64, 1}(var_num)
+	obj_c::Array{Float64, 1} = Array{Float64, 1}(  var_num)
 	for i::Int=1:var_num
 		obj_c[i] = parse(Float64, pieces[i])		#objective function coefficients
 	end
@@ -60,13 +58,13 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	line = readline(f)
 	pieces = split(line)
 	@assert(length(pieces) == var_num)
-	obj_d::Array{Float64, 1} = Array{Float64, 1}(var_num)
+	obj_d::Array{Float64, 1} = Array{Float64, 1}(  var_num)
 	for i::Int=1:var_num
 		obj_d[i] = parse(Float64, pieces[i])		#objective function degree of variables
 	end
 	readline(f)
 
-	constr_c::Array{Float64, 2} = Array{Float64, 2}(pricing_constr_num, var_num)
+	constr_c::Array{Float64, 2} = Array{Float64, 2}(  pricing_constr_num, var_num)
 	for i::Int=1:pricing_constr_num
 		line = readline(f)
 		pieces = split(line)
@@ -77,7 +75,7 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	end
 	readline(f)
 
-	constr_d::Array{Float64, 2} = Array{Float64, 2}(pricing_constr_num, var_num)
+	constr_d::Array{Float64, 2} = Array{Float64, 2}(  pricing_constr_num, var_num)
 	for i::Int=1:pricing_constr_num
 		line = readline(f)
 		pieces = split(line)
@@ -91,7 +89,7 @@ function read_pricing(filename::AbstractString)::PricingSpecs
 	line = readline(f)
 	pieces = split(line)
 	@assert(length(pieces) == pricing_constr_num)
-	constr_rhs::Array{Float64, 1} = Array{Float64, 1}(pricing_constr_num)
+	constr_rhs::Array{Float64, 1} = Array{Float64, 1}(  pricing_constr_num)
 	for i::Int=1:pricing_constr_num
 		constr_rhs[i] = parse(Float64, pieces[i])		#rhs value of constraints
 	end
@@ -104,27 +102,52 @@ end
 
 
 
+
+
 """
-Create a pricing model given an instance of PricingSpecs.
+Write an output text file
 
 # Input
-- `pricing_spec`: An instance of PricingSpecs.
-
-# Output
-- `pricing_model`: Pricing optimization model.
+- `filename`: Address of the file.
+- `time_limit`: Time limit.
+- `iter_max_ecp`: Max limit on ecp iterations
+- `max_cut_num`: Max cut number added at EACH iteration of ecp
+- `lp_to_ip_iter`: Number of ecp iterations to solve LP before switching to IP (if applicable)
+- `lp_to_ip_tol`: Constraint violation tolerance below which ecp switches to solving IP (if applicable)
+- `obj_improvement_tol`: Objective improvement tolerance over the last few iterations
+- `tol_num_ecp`: The number of last iterations over which the relative obj improvement is computed
+- `obj_val`: Objective value of the relaxation
+- `ecp_status`: Status of the ECP at termination
+- `initial_lp_obj`: Starting LP objective
+- `iter_ecp`: Number of ECP iteration executed
+- `total_cuts`: Total number of added DD cuts
+- `ecp_time`: Total ECP elapsed time
+- `width`: Array of widths of DDs in the model
+- `dd_time`: Time to construct DD (and form root node)
+- `relative_obj_improvement`: relative obj improvement over the last few iterations at termination
 """
-function create_pricing_model(pricing_spec::PricingSpecs)::JuMP.Model
+function write_pricing(filename::AbstractString, time_limit::Float64, iter_max_ecp::Int, max_cut_num::Int, lp_to_ip_iter::Int, lp_to_ip_tol::Float64, obj_val::Float64, obj_improvement_tol::Float64, tol_num_ecp::Int,
+	ecp_status::Symbol, initial_lp_obj::Float64, iter_ecp::Int, total_cuts::Int, ecp_time::Float64, width::Array{Int, 1}, dd_time::Float64, relative_obj_improvement::Float64)
 
-	m = Model(solver = ClpSolver())
-
-	@variable(m, x[i=1:pricing_spec.var_num], lowerbound = pricing_spec.lb[i], upperbound = pricing_spec.ub[i])
-
-	scale::Array{Int, 1} = pricing_spec.ub											# variable x is divided by scale everywhere in the model
-	obj::JuMP.AffExpr = AffExpr(x, pricing_spec.obj_c, 0.0)				#the objective function is linear
-	@objective(m, Max, obj)
-
-	@NLconstraint(m, pricing_constr[i=1:pricing_spec.pricing_constr_num], sum(pricing_spec.constr_c[i,j]*(x[j]/scale[j])*e^(-(x[j]/scale[j])^pricing_spec.constr_d[i,j]) for j=1:pricing_spec.var_num) <= pricing_spec.constr_rhs[i])
-
-	return m
-
+	open(filename, "w") do f
+		write(f, "This file contains the result of ECP for pricing problem\n")
+		write(f, "********************************************************\n\n")
+		write(f, "Starting objective value:\t$initial_lp_obj\n\n")
+		write(f, "Final objective value:\t$obj_val\n\n")
+		write(f, "ECP status:\t$ecp_status\n\n")
+		write(f, "DD construction time:\t$dd_time\n\n")
+		write(f, "ECP time:\t$ecp_time\n\n")
+		write(f, "Time limit:\t$time_limit\n\n")
+		write(f, "Relative obj improvement tolerance:\t$obj_improvement_tol\n\n")
+		write(f, "Number of last few iterations to compute relative obj improvement:\t$tol_num_ecp\n\n")
+		write(f, "Relative obj improvement at termination:\t$relative_obj_improvement\n\n")
+		write(f, "Number of ECP iterations:\t$iter_ecp\n\n")
+		write(f, "Number of added DD cuts:\t$total_cuts\n\n")
+		write(f, "ECP iteration limit:\t$iter_max_ecp\n\n")
+		write(f, "Max cut number at each iteration:\t$max_cut_num\n\n")
+		write(f, "DD widths:\n")
+		for i=1:length(width)
+			write(f, "$(width[i])\t")
+		end
+	end
 end

@@ -1,0 +1,31 @@
+This file contains the result of ECP for pricing problem
+********************************************************
+
+Starting objective value:	0.0
+
+Final objective value:	-18532.12356399023
+
+ECP status:	Not_Optimal
+
+DD construction time:	30.301070692
+
+ECP time:	200.0550000667572
+
+Time limit:	200.0
+
+Relative obj improvement tolerance:	0.0001
+
+Number of last few iterations to compute relative obj improvement:	10
+
+Relative obj improvement at termination:	0.0019120930342915834
+
+Number of ECP iterations:	301
+
+Number of added DD cuts:	1638
+
+ECP iteration limit:	500
+
+Max cut number at each iteration:	10
+
+DD widths:
+926	343	462	1043	263	626	381	411	649	165	

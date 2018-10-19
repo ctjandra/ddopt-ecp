@@ -19,8 +19,10 @@ import LightGraphs.inneighbors
 mutable struct Node{S<:AbstractFloat}
 	layer::Int				# node layer
 	state::S				# node state
-	out_neighbor::Array{Int,1}		# outgoing arcs of the node, stores arc id in the arc layer
-	in_neighbor::Array{Int,1}		# outgoing arcs of the node, stores arc id in the arc layer
+#	out_neighbor::Array{Int,1}		# outgoing arcs of the node, stores arc id in the arc layer
+#	in_neighbor::Array{Int,1}		# outgoing arcs of the node, stores arc id in the arc layer
+	out_neighbor::Dict{Int, Array{Int, 1}}		# key: the id of node neighbor in the next layer, value: set of arcs (id) connected to that node
+	in_neighbor::Dict{Int, Array{Int, 1}}		# key: the id of node neighbor in the previous layer, value: set of arcs (id) connected to that node
 	aux_val::Float64		# auxiliary value at the node e.g., the longest path value
 end
 
@@ -29,7 +31,7 @@ end
 struct DecisionDiagram{S<:AbstractFloat}
 	graph::SimpleDiGraph{Int}            # represents the directed graph of the DD
     node_layers::Array{Array{Node{S},1},1}        # stores instances of the Node class in each node layer
-	arc_layers::Array{Array{Tuple{Int, Int, Int},1},1}		# stores arc info as tuples (tail, head, label) in arc layers
+	arc_layers::Array{Array{Tuple{Int, Int, Float64},1},1}		# stores arc info as tuples (tail, head, label) in arc layers
 end
 
 
@@ -41,7 +43,7 @@ A constrcter for type `DecisionDiagram`
 - `nvars::Int`: Number of variables (arc layers)
 """
 
-DecisionDiagram(nvars::Int; t::DataType = Float64)::DecisionDiagram{t} = DecisionDiagram{t}(SimpleDiGraph{Int}(), [Array{Node{t},1}(0) for i=1:nvars+1], [Array{Tuple{Int, Int, Int},1}(0) for i=1:nvars])
+DecisionDiagram(nvars::Int; t::DataType = Float64)::DecisionDiagram{t} = DecisionDiagram{t}(SimpleDiGraph{Int}(), [Array{Node{t},1}(  0) for i=1:nvars+1], [Array{Tuple{Int, Int, Float64},1}(  0) for i=1:nvars])
 
 
 
@@ -68,7 +70,7 @@ get_node_state(dd::DecisionDiagram, layer::Int, id::Int)::S where S<:AbstractFlo
 
 
 """Return arc label"""
-get_arc_label(dd::DecisionDiagram, layer::Int, id::Int)::Int = dd.arc_layers[layer][id][3]
+get_arc_label(dd::DecisionDiagram, layer::Int, id::Int)::Float64 = dd.arc_layers[layer][id][3]
 #get_arc_labels(dd::DecisionDiagram, arc::LightGraphs.SimpleGraphs.SimpleEdge{Int64}) = collect(dd.nodes[src(e)].out_neighbor[dst(e)])
 
 
@@ -78,6 +80,8 @@ get_arc_head(dd::DecisionDiagram, layer::Int, id::Int)::Int = dd.arc_layers[laye
 
 get_node_layer_size(dd::DecisionDiagram, layer::Int)::Int = length(dd.node_layers[layer])
 get_arc_layer_size(dd::DecisionDiagram, layer::Int)::Int = length(dd.arc_layers[layer])
+
+get_width(dd::DecisionDiagram)::Int = maximum(length(dd.node_layers[i]) for i=1:length(dd.node_layers))
 
 #=
 function get_arc_labels(dd::DecisionDiagram, node1::Int, node2::Int)
@@ -92,10 +96,12 @@ end
 
 
 """Return the array of incoming arcs of a node"""
-inneighbors(dd::DecisionDiagram, layer::Int, id::Int)::Array{Int, 1} = dd.node_layers[layer][id].in_neighbor
+inneighbors(dd::DecisionDiagram, layer::Int, id::Int)::Dict{Int, Array{Int, 1}} = dd.node_layers[layer][id].in_neighbor
+#inneighbors(dd::DecisionDiagram, layer::Int, id::Int)::Array{Int, 1} = dd.node_layers[layer][id].in_neighbor
 
 """Return the array of outgoing nodes of a node"""
-outneighbors(dd::DecisionDiagram, layer::Int, id::Int)::Array{Int, 1} = dd.node_layers[layer][id].out_neighbor
+outneighbors(dd::DecisionDiagram, layer::Int, id::Int)::Dict{Int, Array{Int, 1}} = dd.node_layers[layer][id].out_neighbor
+#outneighbors(dd::DecisionDiagram, layer::Int, id::Int)::Array{Int, 1} = dd.node_layers[layer][id].out_neighbor
 
 
 
@@ -106,8 +112,8 @@ outneighbors(dd::DecisionDiagram, layer::Int, id::Int)::Array{Int, 1} = dd.node_
 function add_node!(dd::DecisionDiagram, layer::Int, state::S)::Int where S<:AbstractFloat
 	#g = dd.graph
 	#add_vertex!(g)
-	#aux_node = Node(layer, length(dd.layers[layer]), state, 0.0, Dict{Int, Set{Number}}(), Dict{Int, Set{Number}}())
-	aux_node::Node{S} = Node(layer, state, Array{Int, 1}(0), Array{Int,1}(0), 0.0)
+	#aux_node::Node{S} = Node(layer, state, Array{Int, 1}(0), Array{Int,1}(0), 0.0)		#This is for the case where neighbor field stores array of arcs only
+	aux_node::Node{S} = Node(layer, state, Dict{Int, Array{Int, 1}}(), Dict{Int, Array{Int, 1}}(), 0.0)
 	push!(dd.node_layers[layer], aux_node)
 	id::Int = length(dd.node_layers[layer])
 	return id
@@ -171,78 +177,77 @@ end
 
 
 
-#=
-"""Add a new arc to the decision diagram between two nodes"""
-function add_arc!(dd::DecisionDiagram, node1::Int, node2::Int, label::Int)
-	@assert((dd.nodes[node1].layer < dd.nodes[node2].layer) && (node1 <= length(dd.nodes)) && (node2 <= length(dd.nodes)))
-	#g = dd.graph
-	#e = Edge(node1, node2)
-
-	# check if an arc between two nodes already exists
-	i = findfirst(dd.nodes[node1].out_neighbor_nodes, node2)
-	if i==0
-		#add_edge!(g, e)
-		push!(dd.nodes[node1].out_neighbor_nodes, node2)
-		push!(dd.nodes[node1].out_neighbor_arcs, [label])
-		push!(dd.nodes[node2].in_neighbor_nodes, node1)
-		push!(dd.nodes[node2].in_neighbor_arcs, [label])
-	else
-		j = findfirst(dd.nodes[node2].in_neighbor_nodes, node1)
-		push!(dd.nodes[node1].out_neighbor_arcs[i], label)
-		push!(dd.nodes[node2].in_neighbor_arcs[j], label)
-	end
-end
-=#
-
 """Add a new arc to the decision diagram between two nodes and retunrs arc id in its layer"""
-function add_arc!(dd::DecisionDiagram, layer1::Int, node1_id::Int, layer2::Int, node2_id::Int, label::Int)
+function add_arc!(dd::DecisionDiagram, layer1::Int, node1_id::Int, layer2::Int, node2_id::Int, label::Float64)::Int
 	#@assert((dd.nodes[node1].layer < dd.nodes[node2].layer) && (node1 <= length(dd.nodes)) && (node2 <= length(dd.nodes)))
 	#g = dd.graph
 	#e = Edge(node1, node2)
 	@assert(layer1 == layer2 - 1)
+#	if isa(label, Int)					# converts Int label type to floating point
+#		lbl = float(label)
+#	else
+#		lbl = label
+#	end
 	push!(dd.arc_layers[layer1], (node1_id, node2_id, label))
 	id::Int = length(dd.arc_layers[layer1])
-	push!(dd.node_layers[layer1][node1_id].out_neighbor, id)
-	push!(dd.node_layers[layer2][node2_id].in_neighbor, id)
+#	push!(dd.node_layers[layer1][node1_id].out_neighbor, id)	#for case where neighbors are array of arcs only
+#	push!(dd.node_layers[layer2][node2_id].in_neighbor, id)	#for case where neighbors are array of arcs only
+	if haskey(dd.node_layers[layer1][node1_id].out_neighbor, node2_id)
+		push!(dd.node_layers[layer1][node1_id].out_neighbor[node2_id], id)
+		push!(dd.node_layers[layer2][node2_id].in_neighbor[node1_id], id)
+	else
+		dd.node_layers[layer1][node1_id].out_neighbor[node2_id] = [id]
+		dd.node_layers[layer2][node2_id].in_neighbor[node1_id] = [id]
+	end
+	return id
 end
 
 
-#=
+
 """
-	Add a new arc to the decision diagram between two nodes, where the arc_merging is on.
+	Add a new arc to the decision diagram between two nodes, where the arc_merging is on. Returns the arc id in the layer.
 	If the arc is parallel, it does not add the arc if its label is not lower or upper bound among other arcs.
 """
-function add_reduced_arc!(dd::DecisionDiagram, node1::Int, node2::Int, label::Int)
-	@assert((dd.nodes[node1].layer < dd.nodes[node2].layer) && (node1 <= length(dd.nodes)) && (node2 <= length(dd.nodes)))
+#NOTE: this code considers the case where inneighbor/outneighbor field is a Dict (NOT array)
+function add_reduced_arc!(dd::DecisionDiagram, layer1::Int, node1_id::Int, layer2::Int, node2_id::Int, label::Float64)::Int
 	#g = dd.graph
 	#e = Edge(node1, node2)
-
-	# We use a list for labels because LightGraphs does not support parallel edges
+	id::Int = 0			# if the arc is not added, the returning id will be zero
 	# check if an arc between two nodes already exists
-	if !haskey(dd.nodes[node1].out_neighbor, node2)
+	if !haskey(dd.node_layers[layer1][node1_id].out_neighbor, node2_id)
 		#add_edge!(g, e)
-		dd.nodes[node1].out_neighbor[node2] = Set([label])
-		dd.nodes[node2].in_neighbor[node1] = Set([label])
-	elseif length(dd.nodes[node1].out_neighbor[node2]) == 1		# if there is only a single arc
-		push!(dd.nodes[node1].out_neighbor[node2], label)	# adds the new label to the parallel arcs
-		push!(dd.nodes[node2].in_neighbor[node1], label)
+		push!(dd.arc_layers[layer1], (node1_id, node2_id, label))
+		id = length(dd.arc_layers[layer1])
+		dd.node_layers[layer1][node1_id].out_neighbor[node2_id] = [id]
+		dd.node_layers[layer2][node2_id].in_neighbor[node1_id] = [id]
+	# if there is only a single arc, the arc is added to in/outneighbor in an increasing order wrt label value
+	elseif length(dd.node_layers[layer1][node1_id].out_neighbor[node2_id]) == 1
+		push!(dd.arc_layers[layer1], (node1_id, node2_id, label))
+		id = length(dd.arc_layers[layer1])
+		if dd.arc_layers[layer1][dd.node_layers[layer1][node1_id].out_neighbor[node2_id][1]][3] <= label
+			 push!(dd.node_layers[layer1][node1_id].out_neighbor[node2_id], id)	# adds the new label to the parallel arcs
+			 push!(dd.node_layers[layer2][node2_id].in_neighbor[node1_id], id)
+		 else
+			 pushfirst!(dd.node_layers[layer1][node1_id].out_neighbor[node2_id], id)	# adds the new label to the parallel arcs
+ 			 pushfirst!(dd.node_layers[layer2][node2_id].in_neighbor[node1_id], id)
+ 		 end
+	# if there are two arcs between the nodes, the new arc is added only if it does not belong to the label interval of the current arcs
+	# To add the new arc, we only need to change the label of the arc that is being replaced
 	else
-		@assert(length(dd.nodes[node1].out_neighbor[node2]) == 2)
-		temp = collect(dd.nodes[node1].out_neighbor[node2])			# creates an array of elements of the set
-		if label > max(temp[1],temp[2])
-			push!(dd.nodes[node1].out_neighbor[node2], label)	# adds the new label to the parallel arcs
-			setdiff!(dd.nodes[node1].out_neighbor[node2], max(temp[1],temp[2]))
-			push!(dd.nodes[node2].in_neighbor[node1], label)	# adds the new label to the parallel arcs
-			setdiff!(dd.nodes[node2].in_neighbor[node1], max(temp[1],temp[2]))
-		elseif label < min(temp[1],temp[2])
-			push!(dd.nodes[node1].out_neighbor[node2], label)	# adds the new label to the parallel arcs
-			setdiff!(dd.nodes[node1].out_neighbor[node2], min(temp[1],temp[2]))
-			push!(dd.nodes[node2].in_neighbor[node1], label)	# adds the new label to the parallel arcs
-			setdiff!(dd.nodes[node2].in_neighbor[node1], min(temp[1],temp[2]))
+		@assert(length(dd.node_layers[layer1][node1_id].out_neighbor[node2_id]) == 2)
+		id1 = dd.node_layers[layer1][node1_id].out_neighbor[node2_id][1]
+		id2 = dd.node_layers[layer1][node1_id].out_neighbor[node2_id][2]
+		if label < dd.arc_layers[layer1][id1][3]
+			id = id1
+			dd.arc_layers[layer1][id] = (node1_id, node2_id, label)
+		elseif label > dd.arc_layers[layer1][id2][3]
+			id = id2
+			dd.arc_layers[layer1][id] = (node1_id, node2_id, label)
 		end
 	end
+	return id
 end
-=#
+
 
 
 

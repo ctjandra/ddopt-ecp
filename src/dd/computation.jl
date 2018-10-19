@@ -19,9 +19,9 @@ function longest_path(dd::DecisionDiagram, func::Array{Function})
     @assert(n == length(func))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
 
     node_num = nnodes(dd)
-    node_obj_vals = Array{Float64}(node_num)   #stores the maximum objective value computed from the source to each node
-    node_obj_paths = Array{Int}(node_num)   #at each node, stores the index of the previous node of longest path from source to that node
-    node_obj_labels = Array{Int}(node_num)  #stores the label value of the last arc of the longest path from source to each node
+    node_obj_vals = Array{Float64}(  node_num)   #stores the maximum objective value computed from the source to each node
+    node_obj_paths = Array{Int}(  node_num)   #at each node, stores the index of the previous node of longest path from source to that node
+    node_obj_labels = Array{Int}(  node_num)  #stores the label value of the last arc of the longest path from source to each node
 
     #setting the root objective value equal to zero
     node_obj_vals[root(dd)] = 0
@@ -47,7 +47,7 @@ function longest_path(dd::DecisionDiagram, func::Array{Function})
     terminal_node = terminal(dd)
     lpv = node_obj_vals[terminal_node]   #the length of the longest path
 
-    lp = Array{Int}(0)
+    lp = Array{Int}(  0)
     p = terminal_node
     #computing the arc labels on the longest path through a backtracking
     for i=n:-1:1
@@ -68,17 +68,20 @@ Second method for function Longest_Path, where weight functions are linear for a
 # Input
 - `dd::DecisionDiagram`: The DD.
 - `cf::Array{T} where T<:Float64`: An array of coefficients of the variables in the linear objective function.
+"""
 
+#=
 function longest_path(dd::DecisionDiagram, cf::Array{T} where T<:Float64)
-    func = Array{Function}(length(cf))
+    func = Array{Function}(  length(cf))
     for (i, c) in enumerate(cf)                 #creates an array of separable functions for each variable
         func[i] = (x::Int64) -> c*x
     end
     return longest_path(dd, func)
 end
-"""
+=#
+
 #This version is for DD structure where we store arc layers, and use them directly to compute the longest path
-function longest_path(dd::DecisionDiagram, cf::Array{Float64})::Tuple{Array{Int, 1}, Float64}
+function longest_path(dd::DecisionDiagram, cf::Array{Float64})::Tuple{Array{Float64, 1}, Float64}
 
     n::Int = nvars(dd)
     @assert(n == length(cf))       #makes sure the size of the fractional point matches the dimension of variables represented by dd
@@ -103,11 +106,12 @@ function longest_path(dd::DecisionDiagram, cf::Array{Float64})::Tuple{Array{Int,
     # Computing the max obj for the terminal node
     lpv::Float64 = aux_val[n+1][1]   #the length of the longest path
 
-    lp::Array{Int, 1} = Array{Int, 1}(0)
+    lp::Array{Float64, 1} = Array{Float64, 1}(0)
     p::Int = 1                   #terminal node id at the last layer
     # Computing the arc labels on the longest path through a backtracking
     for i::Int=n+1:-1:2
-        for in_arc::Int in inneighbors(dd, i, p)
+        for tail in values(inneighbors(dd, i, p)), in_arc::Int in tail
+        #for in_arc::Int in inneighbors(dd, i, p)                       # this is for inneighbor that is array of int
             val::Float64 = aux_val[i-1][get_arc_tail(dd, i-1, in_arc)] + cf[i-1]*get_arc_label(dd, i-1, in_arc)    #computes the head node value based on the tail and arc label
             if val == aux_val[i][p]
                 push!(lp, get_arc_label(dd, i-1, in_arc))

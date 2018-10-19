@@ -10,8 +10,8 @@ module Dexter
     include("dd/construction.jl")
     include("dd/computation.jl")
 
+    include("dd/bb/bb_tree.jl")
     include("dd/mathprog/decomposition.jl")
-    include("dd/mathprog/dp_specification.jl")
-
+    include("dd/mathprog/function_analysis.jl")
     include("ip/oa/ecp.jl")
 end
